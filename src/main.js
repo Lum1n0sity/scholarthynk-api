@@ -1,16 +1,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
 
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(cors());
 
 const secretKey = process.env.SECRET_KEY;
@@ -21,30 +21,7 @@ mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTop
 
 function getDatabase(dbName) {
   return mongoose.connection.useDb(dbName, { useCache: true });
-}
-
-// * Example endpoint
-/**
-app.get('/:dbName/collection/:collectionName', async (req, res) => {
-  const { dbName, collectionName } = req.params;
-
-  try {
-    // Get the specific database
-    const db = getDatabase(dbName);
-
-    // Access a collection within that database
-    const collection = db.collection(collectionName);
-
-    // Perform an operation, e.g., find all documents
-    const documents = await collection.find({}).toArray();
-
-    res.json({ success: true, data: documents });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-**/
+} 
 
 app.get('/', async (req, resp) => {
   resp.send('Hello World');
@@ -60,7 +37,7 @@ app.post('/api/signup', async (req, resp) => {
 
     if (name && email && password && await collection.findOne({ email: email}) == null) {
       const userId = generateUserId();
-      const authToken = remember ? generateAuthToken(userId) : null;
+      const authToken = generateAuthToken(userId);
       const hash = await bcrypt.hash(password, saltRounds);
       collection.insertOne({ userId: userId, name: name, email: email, password: hash, createdAt: new Date() });
       resp.json({ success: true, authToken: authToken });
@@ -105,8 +82,62 @@ const authMiddleware = (req, res, next) => {
   next();
 };
 
-app.get('/api/auth', authMiddleware, async (req, resp) => {
-  resp.json({ success: true, userId: req.user });
+app.get('/api/verify', authMiddleware, async (req, resp) => {
+  resp.status(200).json({ success: true, userId: req.user });
+});
+
+app.post('/api/delete-account', authMiddleware,  async (req, resp) => {
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('users');
+
+    const user = await collection.findOne({ userId: req.user });
+    if (!user) return resp.status(404).json({ success: false, error: 'User not found!' });
+
+    await collection.deleteOne({ userId: req.user });
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/get-user-data', authMiddleware, async (req, resp) => {
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('users');
+
+    const user = await collection.findOne({ userId: req.user }, { projection: { password: 0, _id: 0, createdAt: 0 } });
+    if (!user) return resp.status(404).json({ success: false, error: 'User not found!' });
+
+    resp.status(200).json({ success: true, user: user });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+const storageProfilePics = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/profilePics');
+  },
+  filename: (req, file, cb) => {
+    const userId = req.user;
+    if (!userId) {
+      return cb(new Error('User ID is required'), null);
+    }
+    cb(null, userId + '.png');
+  },
+});
+
+const uploadProfilePic = multer({ storage: storageProfilePics }).single('profilePic');
+
+app.post('/api/upload-profile-pic', authMiddleware, uploadProfilePic, async (req, resp) => {
+  if (req.file) {
+    resp.status(200).json({ success: true });
+  } else {
+    resp.status(400).json({ success: false, error: 'No file uploaded!' });
+  }
 });
 
 function generateAuthToken(userId) {
