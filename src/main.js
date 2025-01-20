@@ -4,6 +4,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
+const path = require('path');
+const { glob } = require('glob');
 
 require('dotenv').config();
 
@@ -137,6 +139,78 @@ app.post('/api/upload-profile-pic', authMiddleware, uploadProfilePic, async (req
     resp.status(200).json({ success: true });
   } else {
     resp.status(400).json({ success: false, error: 'No file uploaded!' });
+  }
+});
+
+app.get('/api/get-profile-pic', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  if (!userId) {
+    return resp.status(400).json({ success: false, error: 'User ID is required!' });
+  }
+
+  const filePathPattern = path.join(__dirname, '../uploads/profilePics', `${userId}.*`);
+
+  try {
+    const files = await glob(filePathPattern);
+
+    if (files.length === 0) {
+      return resp.status(404).json({ success: false, error: 'Profile picture not found' });
+    }
+
+    resp.sendFile(files[0]);
+  } catch (err) {
+    console.error('Error finding profile picture:', err);
+    return resp.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/new-event', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const { name, date } = req.body;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('events');
+
+    const event = { userId: userId, name: name, date: date };
+    await collection.insertOne(event);
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/get-events', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const date = req.body.date;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('events');
+
+    const events = await collection.find({ userId: userId, date: date }).toArray();
+    
+    resp.status(200).json({ success: true, events: events });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/delete-event', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const { name, date} = req.body;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('events');
+
+    await collection.deleteOne({ userId: userId, name: name, date: date });
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
   }
 });
 
