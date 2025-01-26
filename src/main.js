@@ -214,6 +214,106 @@ app.post('/api/delete-event', authMiddleware, async (req, resp) => {
   }
 });
 
+app.get('/api/get-assignments', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('assignments');
+
+    const assignments = await collection.find({ userId: userId }, { projection: { userId: 0, _id: 0 }}).toArray();
+
+    const currentDate = new Date();
+
+    assignments.forEach(async assignment => {
+      if (assignment.expire != null) {
+        const targetTimestamp = assignment.expire;
+
+        const currentDateString = currentDate.toISOString().split('T')[0];
+
+        const targetDate = new Date(targetTimestamp);
+        const targetDateString = targetDate.toISOString().split('T')[0];
+  
+        console.log(currentDateString);
+        console.log(targetDateString);
+
+        if (currentDateString == targetDateString) {
+          await collection.deleteOne({ userId: userId, title: assignment.title });
+        }
+      }
+    });
+
+    resp.status(200).json({ success: true, assignments: assignments });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/add-assignment', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const { title, dueDate, subject, priority, description } = req.body;
+
+  if (!title || !dueDate || !subject || !priority) return resp.status(400).json({ success: false, error: 'Missing required fields!' });
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('assignments');
+    
+    const assignmentExists = await collection.findOne({ userId: userId, title: title });
+    if (assignmentExists) return resp.status(409).json({ success: false, error: 'Assignment already exists!' });
+
+    const assignment = { userId: userId, title: title, dueDate: dueDate, subject: subject, status: "open", priority: priority, description: description };
+    await collection.insertOne(assignment);
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/update-assignment', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const assignment = req.body.assignment;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('assignments');    
+
+    const currentDate = new Date();
+
+    const updatedAssignment = {
+      subject: assignment.subject,
+      status: assignment.status,
+      priority: assignment.priority,
+      description: assignment.description,
+      expire: assignment.status == "done" ? new Date().setDate(currentDate.getDate() + 10) : null
+    }
+    
+    await collection.updateOne({ userId: userId, title: assignment.title }, { $set: updatedAssignment });
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+})
+
+app.post('/api/delete-assignment', authMiddleware, async (req, resp) => {
+  const userId = req.user;
+  const assignment = req.body.assignment;
+
+  try {
+    const db = getDatabase('scholarthynk');
+    const collection = db.collection('assignments');
+
+    await collection.deleteOne({ userId: userId, title: assignment.title });
+    resp.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    resp.status(500).json({ success: false, error: error.message });
+  }
+});
+
 function generateAuthToken(userId) {
   return jwt.sign({ userId }, secretKey, { expiresIn: '7d' });
 }
