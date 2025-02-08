@@ -234,9 +234,6 @@ app.get('/api/get-assignments', authMiddleware, async (req, resp) => {
                 const targetDate = new Date(targetTimestamp);
                 const targetDateString = targetDate.toISOString().split('T')[0];
 
-                console.log(currentDateString);
-                console.log(targetDateString);
-
                 if (currentDateString == targetDateString) {
                     await collection.deleteOne({userId: userId, title: assignment.title});
                 }
@@ -298,7 +295,7 @@ app.post('/api/update-assignment', authMiddleware, async (req, resp) => {
             status: assignment.status,
             priority: assignment.priority,
             description: assignment.description,
-            expire: assignment.status == "done" ? new Date().setDate(currentDate.getDate() + 10) : null
+            expire: assignment.status === "done" ? new Date().setDate(currentDate.getDate() + 10) : null
         }
 
         await collection.updateOne({userId: userId, title: assignment.title}, {$set: updatedAssignment});
@@ -328,22 +325,81 @@ app.post('/api/delete-assignment', authMiddleware, async (req, resp) => {
 app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
     const userId = req.user;
     const folder = req.body.folder;
+    const path = req.body.path;
 
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('notes');
 
-        const folders = await collection.find({
-            type: "folder",
-            userId: userId,
-            parentFolder: folder
-        }, {projection: {_id: 0, userId: 0}}).toArray();
+        let folders = [];
+        let files = [];
+        let children = [];
 
-        const files = await collection.find({
-            type: "file",
-            userId: userId,
-            parentFolder: folder
-        }, {projection: {_id: 0, fileContent: 0, userId: 0}}).toArray();
+        if (folder === "root") {
+            folders = await collection.find({ userId: userId, parentFolder: null, type: "folder" }).toArray();
+            files = await collection.find({ userId: userId, parentFolder: null, type: "file" }).toArray();
+        } else {
+            const firstFolder = await collection.findOne({ userId: userId, name: path[1], parentFolder: null, type: "folder" });
+
+            if (!firstFolder) {
+                return resp.status(404).json({ success: false, error: "Folder not found!" });
+            }
+
+            let pathIndex = 2;
+
+            let currentFolder = firstFolder;
+
+            while (pathIndex < path.length && currentFolder.children.length > 0) {
+                let nextFolderID = "";
+
+                for (const child of currentFolder.children) {
+                    const folder = await collection.findOne({ userId: userId, _id: child });
+
+                    if (folder.name === path[pathIndex]) {
+                        nextFolderID = folder._id;
+                        break;
+                    }
+                }
+
+                if (nextFolderID) {
+                    currentFolder = await collection.findOne({ userId: userId, _id: nextFolderID, type: "folder" });
+                    pathIndex++;
+                } else {
+                    console.log("Folder not found at path index:", pathIndex);
+                    break;
+                }
+            }
+
+            for (const child of currentFolder.children) {
+                const item = await collection.findOne({ userId: userId, _id: child });
+                children.push(item);
+            }
+        }
+
+        children.forEach(item => {
+            if (item.type === "folder") {
+                folders.push(item);
+            } else {
+                files.push(item);
+            }
+        });
+
+        // Format the lastEdited field for folders and files
+        folders.forEach(folder => {
+            const date = folder.lastEdited;
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            folder.lastEdited = `${day}.${month}.${year}`;
+        });
+
+        files.forEach(file => {
+            const date = file.lastEdited;
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            file.lastEdited = `${day}.${month}.${year}`;
+        });
 
         resp.status(200).json({success: true, folders: folders, files: files});
     } catch (error) {
@@ -354,26 +410,123 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
 
 app.post('/api/create-folder', authMiddleware, async (req, resp) => {
     const userId = req.user;
-    const parent = req.body.folder;
+    const parentFolderName = req.body.folder;
     const name = req.body.name;
 
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('notes');
 
-        const allFolders = await collection.find({
+        if (name.length === 0) {
+            return resp.status(400).json({ success: false, error: 'Folder name cannot be empty!' });
+        }
+
+        if (name === "root") {
+            return resp.status(400).json({ success: false, error: "Folder cannot be named 'root'!" });
+        }
+
+        let parentFolder;
+
+        if (parentFolderName === "root") {
+            parentFolder = null;
+        } else {
+            parentFolder = await collection.findOne({
+                type: "folder",
+                userId: userId,
+                name: parentFolderName
+            });
+
+            if (!parentFolder) {
+                return resp.status(404).json({ success: false, error: 'Parent folder not found!' });
+            }
+        }
+
+        const folderExists = await collection.findOne({
             type: "folder",
             userId: userId,
-            parentFolder: folder
-        }).toArray();
-
-        allFolders.forEach(folder => {
-            if (folder.name == name) {
-                resp.status(409).json({success: false, error: 'Folder already exists!'});
-            }
+            name: name,
+            parentFolder: parentFolderName === "root" ? null : parentFolderName
         });
 
-        await collection.insertOne({name:name, userId: userId, type:"folder", lastEdited: getCurrentDate(), parentFolder: parent, fileContent: null});
+        if (folderExists) {
+            return resp.status(409).json({ success: false, error: 'Folder with this name already exists!' });
+        }
+
+        const newFolder = {
+            name: name,
+            userId: userId,
+            type: "folder",
+            lastEdited: new Date(),
+            parentFolder: parentFolderName === "root" ? null : parentFolderName,
+            children: []
+        };
+
+        const result = await collection.insertOne(newFolder);
+
+        if (parentFolderName !== "root") {
+            await collection.updateOne(
+                { _id: parentFolder._id },
+                { $push: { children: result.insertedId } }
+            );
+        }
+
+        return resp.status(200).json({ success: true });
+
+    } catch (error) {
+        console.error(error);
+        return resp.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/delete-folder', authMiddleware, async (req, resp) => {
+    const userId = req.user;
+    const folder = req.body.folder;
+    const parentFolderName = req.body.parent;
+
+    try {
+        const db = getDatabase('scholarthynk');
+        const collection = db.collection('notes');
+
+        if (folder == "root") {
+            resp.status(400).json({success: false, error: "You cannot delete root folder!"});
+        }
+
+        async function deleteFolderRecursively(folderId) {
+            const folder = await collection.findOne({userId: userId, _id: folderId});
+
+            if (!folder) return;
+
+            if (folder.children && folder.children.length > 0) {
+                for (const childId of folder.children) {
+                    await deleteFolderRecursively(childId);
+                }
+            }
+
+            const parentFolder = await collection.findOne({userId:userId, name: folder.parentFolder});
+            if (parentFolder) {
+                await collection.updateOne(
+                    {userId: userId, _id: parentFolder._id},
+                    {$pull: {children: folderId}}
+                );
+            }
+
+            await collection.deleteOne({userId: userId, _id: folderId});
+        }
+
+        const folderToDelete = await collection.findOne({
+            userId: userId,
+            name: folder,
+            parentFolder: parentFolderName,
+            type: "folder"
+        });
+
+        if (!folderToDelete) {
+            resp.status(404).json({success: false, error: "Folder not found!"});
+        }
+
+        await deleteFolderRecursively(folderToDelete._id);
+
+        resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
         resp.status(500).json({success: false, error: error.message});
