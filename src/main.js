@@ -30,7 +30,7 @@ app.get('/', async (req, resp) => {
 });
 
 app.post('/api/signup', async (req, resp) => {
-    const {name, email, password, remember} = req.body;
+    const {name, email, password} = req.body;
     const saltRounds = 12;
 
     try {
@@ -53,7 +53,7 @@ app.post('/api/signup', async (req, resp) => {
 });
 
 app.post('/api/login', async (req, resp) => {
-    const {email, password, remember} = req.body;
+    const {email, password} = req.body;
 
     try {
         const db = getDatabase('scholarthynk');
@@ -336,13 +336,18 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
         let children = [];
 
         if (folder === "root") {
-            folders = await collection.find({ userId: userId, parentFolder: null, type: "folder" }).toArray();
-            files = await collection.find({ userId: userId, parentFolder: null, type: "note" }).toArray();
+            folders = await collection.find({userId: userId, parentFolder: null, type: "folder"}).toArray();
+            files = await collection.find({userId: userId, parentFolder: null, type: "note"}).toArray();
         } else {
-            const firstFolder = await collection.findOne({ userId: userId, name: path[1], parentFolder: null, type: "folder" });
+            const firstFolder = await collection.findOne({
+                userId: userId,
+                name: path[1],
+                parentFolder: null,
+                type: "folder"
+            });
 
             if (!firstFolder) {
-                return resp.status(200).json({ success: true, folders: [], files: [] });
+                return resp.status(200).json({success: true, folders: [], files: []});
             }
 
             let pathIndex = 2;
@@ -352,7 +357,7 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
                 let nextFolderID = "";
 
                 for (const child of currentFolder.children) {
-                    const folder = await collection.findOne({ userId: userId, _id: child });
+                    const folder = await collection.findOne({userId: userId, _id: child});
 
                     if (folder.name === path[pathIndex]) {
                         nextFolderID = folder._id;
@@ -361,7 +366,7 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
                 }
 
                 if (nextFolderID) {
-                    currentFolder = await collection.findOne({ userId: userId, _id: nextFolderID, type: "folder" });
+                    currentFolder = await collection.findOne({userId: userId, _id: nextFolderID, type: "folder"});
                     pathIndex++;
                 } else {
                     break;
@@ -369,7 +374,7 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
             }
 
             for (const child of currentFolder.children) {
-                const item = await collection.findOne({ userId: userId, _id: child });
+                const item = await collection.findOne({userId: userId, _id: child});
                 children.push(item);
             }
         }
@@ -416,11 +421,11 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
         const collection = db.collection('notes');
 
         if (folderName.length === 0) {
-            return resp.status(400).json({ success: false, error: 'Folder name cannot be empty!' });
+            return resp.status(400).json({success: false, error: 'Folder name cannot be empty!'});
         }
 
         if (folderName === "root") {
-            return resp.status(400).json({ success: false, error: "Folder cannot be named 'root'!" });
+            return resp.status(400).json({success: false, error: "Folder cannot be named 'root'!"});
         }
 
         // Get Parent FolderID
@@ -429,8 +434,13 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
         let folderIds = [];
 
         for (const folder of parentPath) {
-            if (folder !== "root")  {
-                const id = await collection.findOne({userId: userId, type:"folder", parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]});
+            if (folder !== "root") {
+                const id = await collection.findOne({
+                    userId: userId,
+                    type: "folder",
+                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
+                });
+
                 folderIds.push(id._id);
             }
         }
@@ -442,7 +452,7 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
         const folderExists = await collection.findOne({userId: userId, name: folderName, parentFolder: parentFolderId});
 
         if (folderExists) {
-            return resp.status(409).json({ success: false, error: 'Folder already exists!' });
+            return resp.status(409).json({success: false, error: 'Folder already exists!'});
         }
 
         // Create Folder
@@ -465,82 +475,85 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
             );
         }
 
-        return resp.status(200).json({ success: true });
+        return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        return resp.status(500).json({ success: false, error: error.message });
+        return resp.status(500).json({success: false, error: error.message});
     }
 });
 
 app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
-   const userId = req.user;
-   const itemName = req.body.oldName;
-   const newName = req.body.newName;
-   const parentPath = req.body.path;
+    const userId = req.user;
+    const itemName = req.body.oldName;
+    const newName = req.body.newName;
+    const parentPath = req.body.path;
 
-   try {
-       const db = getDatabase('scholarthynk');
-       const collection = db.collection('notes');
+    try {
+        const db = getDatabase('scholarthynk');
+        const collection = db.collection('notes');
 
-       if (newName === "root") {
-           return resp.status(400).json({ success: false, error: "Item cannot be named root!" });
-       }
+        if (newName === "root") {
+            return resp.status(400).json({success: false, error: "Item cannot be named root!"});
+        }
 
-       let folderIds = [];
-       let currentFolder = null;
+        let folderIds = [];
+        let currentFolder = null;
 
-       for (let i = 1; i < parentPath.length; i++) {
-           const parentId = i === 1 ? null : folderIds[i - 2];
+        for (let i = 1; i < parentPath.length; i++) {
+            const parentId = i === 1 ? null : folderIds[i - 2];
 
-           currentFolder = await collection.findOne({
-               userId: userId,
-               name: parentPath[i],
-               parentFolder: parentId,
-               type: "folder"
-           });
+            currentFolder = await collection.findOne({
+                userId: userId,
+                name: parentPath[i],
+                parentFolder: parentId,
+                type: "folder"
+            });
 
-           if (!currentFolder) {
-               return resp.status(404).json({ success: false, error: `Folder "${parentPath[i]}" not found in path!` });
-           }
+            if (!currentFolder) {
+                return resp.status(404).json({success: false, error: `Folder "${parentPath[i]}" not found in path!`});
+            }
 
-           folderIds.push(currentFolder._id);
-       }
+            folderIds.push(currentFolder._id);
+        }
 
-       const parentFolderId = folderIds.length > 0 ? folderIds[folderIds.length - 1] : null;
+        const parentFolderId = folderIds.length > 0 ? folderIds[folderIds.length - 1] : null;
 
-       // Find the item (either note or folder)
-       const item = await collection.findOne({
-           userId: userId,
-           name: itemName,
-           parentFolder: parentFolderId
-       });
+        // Find the item (either note or folder)
+        const item = await collection.findOne({
+            userId: userId,
+            name: itemName,
+            parentFolder: parentFolderId
+        });
 
-       if (!item) {
-           return resp.status(404).json({ success: false, error: "Item not found!" });
-       }
+        if (!item) {
+            return resp.status(404).json({success: false, error: "Item not found!"});
+        }
 
-       // Check if another item with the new name already exists in the same folder
-       const existingItem = await collection.findOne({
-           userId: userId,
-           name: newName,
-           parentFolder: parentFolderId
-       });
+        // Check if another item with the new name already exists in the same folder
+        const existingItem = await collection.findOne({
+            userId: userId,
+            name: newName,
+            parentFolder: parentFolderId
+        });
 
-       if (existingItem) {
-           return resp.status(400).json({ success: false, error: "An item with this name already exists in this folder!" });
-       }
+        if (existingItem) {
+            return resp.status(400).json({
+                success: false,
+                error: "An item with this name already exists in this folder!"
+            });
+        }
 
-       // Rename the item
-       await collection.updateOne(
-           { _id: item._id },
-           { $set: { name: newName } }
-       );
+        // Rename the item
+        await collection.updateOne(
+            {_id: item._id},
+            {$set: {name: newName}}
+        );
 
-       return resp.status(200).json({ success: true });
-   } catch (error) {
-       console.error(error);
-       resp.status(500).json({success: false, error: error.message});
-   }
+        return resp.status(200).json({success: true});
+    } catch (error) {
+        console.error(error);
+        resp.status(500).json({success: false, error: error.message});
+    }
 });
 
 app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
@@ -553,7 +566,7 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
         const collection = db.collection('notes');
 
         if (itemName === "root") {
-            return resp.status(400).json({ success: false, error: "You cannot delete the root folder!" });
+            return resp.status(400).json({success: false, error: "You cannot delete the root folder!"});
         }
 
         let folderIds = [];
@@ -571,7 +584,7 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
             });
 
             if (!currentFolder) {
-                return resp.status(404).json({ success: false, error: `Item "${path[i]}" not found in path!` });
+                return resp.status(404).json({success: false, error: `Item "${path[i]}" not found in path!`});
             }
 
             folderIds.push(currentFolder._id);
@@ -585,37 +598,37 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
         });
 
         if (!targetItem) {
-            return resp.status(404).json({ success: false, error: "Target item not found!" });
+            return resp.status(404).json({success: false, error: "Target item not found!"});
         }
 
         // If it's a note, delete it directly
         if (targetItem.type === "note") {
-            await collection.deleteOne({ userId: userId, _id: targetItem._id });
+            await collection.deleteOne({userId: userId, _id: targetItem._id});
 
             // Remove note from parent's children list
             if (targetItem.parentFolder) {
                 await collection.updateOne(
-                    { userId: userId, _id: targetItem.parentFolder },
-                    { $pull: { children: targetItem._id } }
+                    {userId: userId, _id: targetItem.parentFolder},
+                    {$pull: {children: targetItem._id}}
                 );
             }
 
-            return resp.status(200).json({ success: true });
+            return resp.status(200).json({success: true});
         }
 
         // If it's a folder, perform recursive deletion
         async function deleteFolderRecursive(folderId) {
-            const folder = await collection.findOne({ userId: userId, _id: folderId });
+            const folder = await collection.findOne({userId: userId, _id: folderId});
             if (!folder) return;
 
             if (folder.children && folder.children.length > 0) {
                 for (const childId of folder.children) {
-                    const child = await collection.findOne({ userId: userId, _id: childId });
+                    const child = await collection.findOne({userId: userId, _id: childId});
                     if (child) {
                         if (child.type === "folder") {
                             await deleteFolderRecursive(childId);
                         } else {
-                            await collection.deleteOne({ userId: userId, _id: childId });
+                            await collection.deleteOne({userId: userId, _id: childId});
                         }
                     }
                 }
@@ -623,16 +636,16 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
 
             if (folder.parentFolder) {
                 await collection.updateOne(
-                    { userId: userId, _id: folder.parentFolder },
-                    { $pull: { children: folderId } }
+                    {userId: userId, _id: folder.parentFolder},
+                    {$pull: {children: folderId}}
                 );
             }
 
-            await collection.deleteOne({ userId: userId, _id: folderId });
+            await collection.deleteOne({userId: userId, _id: folderId});
         }
 
         await deleteFolderRecursive(targetItem._id);
-        resp.status(200).json({ success: true });
+        resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
         resp.status(500).json({success: false, error: error.message});
@@ -651,8 +664,12 @@ app.post('/api/get-note', authMiddleware, async (req, resp) => {
         let folderIds = [];
 
         for (const folder of parentPath) {
-            if (folder !== "root")  {
-                const id = await collection.findOne({userId: userId, type:"folder", parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]});
+            if (folder !== "root") {
+                const id = await collection.findOne({
+                    userId: userId,
+                    type: "folder",
+                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
+                });
                 folderIds.push(id._id);
             }
         }
@@ -660,16 +677,21 @@ app.post('/api/get-note', authMiddleware, async (req, resp) => {
         let note = null;
 
         if (parentPath.length !== 1 && parentPath[0] !== "root") {
-            note = await collection.findOne({ userId: userId, name: noteTitle, parentFolder: folderIds[folderIds.length - 1], type:"note" });
+            note = await collection.findOne({
+                userId: userId,
+                name: noteTitle,
+                parentFolder: folderIds[folderIds.length - 1],
+                type: "note"
+            });
         } else {
-            note = await collection.findOne({ userId: userId, name: noteTitle, parentFolder: null, type:"note" });
+            note = await collection.findOne({userId: userId, name: noteTitle, parentFolder: null, type: "note"});
         }
 
         if (!note) {
-            return resp.status(404).json({ success: false, error: 'Note not found!' });
+            return resp.status(404).json({success: false, error: 'Note not found!'});
         }
 
-        return resp.status(200).json({ success: true, note: note });
+        return resp.status(200).json({success: true, note: note});
     } catch (error) {
         console.error(error);
         resp.status(500).json({success: false, error: error.message});
@@ -687,8 +709,12 @@ app.post('/api/new-note', authMiddleware, async (req, resp) => {
         let folderIds = [];
 
         for (const folder of parentPath) {
-            if (folder !== "root")  {
-                const id = await collection.findOne({userId: userId, type:"folder", parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]});
+            if (folder !== "root") {
+                const id = await collection.findOne({
+                    userId: userId,
+                    type: "folder",
+                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
+                });
                 folderIds.push(id._id);
             }
         }
@@ -716,7 +742,7 @@ app.post('/api/new-note', authMiddleware, async (req, resp) => {
             );
         }
 
-        return resp.status(200).json({ success: true });
+        return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
         resp.status(500).json({success: false, error: error.message});
@@ -737,8 +763,12 @@ app.post('/api/update-note', authMiddleware, async (req, resp) => {
         let folderIds = [];
 
         for (const folder of parentPath) {
-            if (folder !== "root")  {
-                const id = await collection.findOne({userId: userId, type:"folder", parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]});
+            if (folder !== "root") {
+                const id = await collection.findOne({
+                    userId: userId,
+                    type: "folder",
+                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
+                });
                 folderIds.push(id._id);
             }
         }
@@ -746,13 +776,18 @@ app.post('/api/update-note', authMiddleware, async (req, resp) => {
         let note = null;
 
         if (parentPath.length !== 1 && parentPath[0] !== "root") {
-            note = await collection.findOne({ userId: userId, name: oldNoteTitle, parentFolder: folderIds[folderIds.length - 1], type:"note" });
+            note = await collection.findOne({
+                userId: userId,
+                name: oldNoteTitle,
+                parentFolder: folderIds[folderIds.length - 1],
+                type: "note"
+            });
         } else {
-            note = await collection.findOne({ userId: userId, name: oldNoteTitle, parentFolder: null, type:"note" });
+            note = await collection.findOne({userId: userId, name: oldNoteTitle, parentFolder: null, type: "note"});
         }
 
         if (!note) {
-            return resp.status(404).json({ success: false, error: 'Note not found!' });
+            return resp.status(404).json({success: false, error: 'Note not found!'});
         }
 
         await collection.updateOne(
@@ -760,7 +795,7 @@ app.post('/api/update-note', authMiddleware, async (req, resp) => {
             {$set: {fileContent: noteContent, name: noteTitle, lastEdited: new Date()}}
         );
 
-        return resp.status(200).json({ success: true });
+        return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
         resp.status(500).json({success: false, error: error.message});
