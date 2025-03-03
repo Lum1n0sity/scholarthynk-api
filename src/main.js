@@ -220,7 +220,18 @@ const storageProfilePics = multer.diskStorage({
     },
 });
 
-const uploadProfilePic = multer({storage: storageProfilePics}).single('profilePic');
+const uploadProfilePic = multer({
+    storage: storageProfilePics,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+        cb(null, true);
+    }
+}).single('profilePic');
 
 app.post('/api/upload-profile-pic', authMiddleware, loggingMiddleware, uploadProfilePic, async (req, resp) => {
     if (req.file) {
