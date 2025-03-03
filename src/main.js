@@ -6,6 +6,8 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const {glob} = require('glob');
+const pino = require('pino');
+const fs = require('fs');
 
 require('dotenv').config();
 
@@ -17,19 +19,77 @@ app.use(cors());
 
 const secretKey = process.env.SECRET_KEY;
 
-mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true, useUnifiedTopology: true})
-    .then(() => console.log('MongoDB connected...'))
-    .catch(err => console.error(err));
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 45000
+})
+    .then(() => {
+        console.log('MongoDB connected!');
+        logger.info('MongoDB connected!');
+    })
+    .catch(err => {
+        console.error(err);
+        logger.error(err);
+    });
 
+/**
+ * Returns a mongoose database connection object for the given database name.
+ * @param {string} dbName - the name of the database
+ * @returns {Db} - a mongoose database connection object
+ */
 function getDatabase(dbName) {
     return mongoose.connection.useDb(dbName, {useCache: true});
 }
+
+const transport = pino.transport({
+    targets: [
+        {
+            target: "pino/file",
+            options: {destination: "./logs/scholarthynk-api.log", mkdir: true, append: true}
+        }
+    ]
+});
+
+const logger = pino({level: "info"}, transport);
+
+/**
+ * Express middleware that checks if the request has a valid authorization token.
+ * If the token is valid, it adds the user ID to the request object and calls the next middleware.
+ * If the token is invalid or missing, it returns a 401 Unauthorized response.
+ * @param {IncomingMessage} req - The request object.
+ * @param {ServerResponse} res - The response object.
+ * @param {Function} next - The next middleware in the stack.
+ */
+const authMiddleware = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({success: false, error: 'Unable to authorize!'});
+
+    const payload = verifyAuthToken(token);
+    if (!payload) return res.status(401).json({success: false, error: 'Unable to authorize!'});
+
+    req.user = payload.userId;
+    next();
+};
+
+/**
+ * Express middleware that logs incoming requests using pino.
+ * @param {IncomingMessage} req - The request object.
+ * @param {ServerResponse} res - The response object.
+ * @param {Function} next - The next middleware in the stack.
+ */
+const loggingMiddleware = (req, res, next) => {
+    logger.info({method: req.method, url: req.url, user: req.user || "guest"}, "Incoming request");
+    next();
+};
 
 app.get('/', async (req, resp) => {
     resp.send('Hello World');
 });
 
-app.post('/api/signup', async (req, resp) => {
+app.post('/api/signup', loggingMiddleware, async (req, resp) => {
     const {name, email, password} = req.body;
     const saltRounds = 12;
 
@@ -37,27 +97,54 @@ app.post('/api/signup', async (req, resp) => {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('users');
 
-        if (name && email && password && await collection.findOne({email: email}) == null) {
-            const userId = generateUserId();
-            const authToken = generateAuthToken(userId);
-            const hash = await bcrypt.hash(password, saltRounds);
-            collection.insertOne({userId: userId, name: name, email: email, password: hash, createdAt: new Date()});
-            resp.json({success: true, authToken: authToken});
-        } else {
-            resp.status(409).json({success: false, error: 'User already exists!'});
+        if (name.length === 0 || email.length === 0 || password.length === 0) {
+            return resp.status(400).json({success: false});
         }
+
+        const userExists = await collection.findOne({email: email});
+        if (userExists) {
+            return resp.status(409).json({success: false, error: 'User already exists!'});
+        }
+
+        const userId = generateUserId();
+        const authToken = generateAuthToken(userId);
+        const hash = await bcrypt.hash(password, saltRounds);
+
+        collection.insertOne({userId: userId, name: name, email: email, password: hash, createdAt: new Date()});
+        resp.status(200).json({success: true, authToken: authToken});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/login', async (req, resp) => {
+app.post('/api/login', loggingMiddleware, async (req, resp) => {
     const {email, password} = req.body;
 
     try {
         const db = getDatabase('scholarthynk');
+        if (!db) {
+            console.error("Database connection failed!");
+            logger.error("Login: Database connection failed!");
+            resp.status(500).json({
+                success: false,
+                error: "There was an error connecting to the database, Please contact the developer immediately!"
+            });
+        }
+
         const collection = db.collection('users');
+        if (!collection) {
+            console.error("Collection 'users' not found!");
+            logger.error("Login: Collection 'users' not found!");
+            resp.status(500).json({
+                success: false,
+                error: "There was a database error. Please contact the developer immediately!"
+            });
+        }
 
         const user = await collection.findOne({email: email});
         if (!user) return resp.status(401).json({success: false, error: 'Invalid credentials!'});
@@ -69,26 +156,19 @@ app.post('/api/login', async (req, resp) => {
         resp.json({success: true, authToken: token});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-const authMiddleware = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({success: false, error: 'Unauthorized!'});
-
-    const payload = verifyAuthToken(token);
-    if (!payload) return res.status(401).json({success: false, error: 'Unauthorized!'});
-
-    req.user = payload.userId;
-    next();
-};
-
-app.get('/api/verify', authMiddleware, async (req, resp) => {
+app.get('/api/verify', authMiddleware, loggingMiddleware, async (req, resp) => {
     resp.status(200).json({success: true, userId: req.user});
 });
 
-app.post('/api/delete-account', authMiddleware, async (req, resp) => {
+app.post('/api/delete-account', authMiddleware, loggingMiddleware, async (req, resp) => {
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('users');
@@ -100,11 +180,15 @@ app.post('/api/delete-account', authMiddleware, async (req, resp) => {
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.get('/api/get-user-data', authMiddleware, async (req, resp) => {
+app.get('/api/get-user-data', authMiddleware, loggingMiddleware, async (req, resp) => {
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('users');
@@ -115,7 +199,11 @@ app.get('/api/get-user-data', authMiddleware, async (req, resp) => {
         resp.status(200).json({success: true, user: user});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
@@ -134,15 +222,23 @@ const storageProfilePics = multer.diskStorage({
 
 const uploadProfilePic = multer({storage: storageProfilePics}).single('profilePic');
 
-app.post('/api/upload-profile-pic', authMiddleware, uploadProfilePic, async (req, resp) => {
+app.post('/api/upload-profile-pic', authMiddleware, loggingMiddleware, uploadProfilePic, async (req, resp) => {
     if (req.file) {
+        logger.info({
+            message: "File uploaded",
+            user: req.user?.id || "Unknown",
+            filename: req.file.filename,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
         resp.status(200).json({success: true});
     } else {
+        logger.warn("Unable to upload profile picture!");
         resp.status(400).json({success: false, error: 'No file uploaded!'});
     }
 });
 
-app.get('/api/get-profile-pic', authMiddleware, async (req, resp) => {
+app.get('/api/get-profile-pic', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     if (!userId) {
         return resp.status(400).json({success: false, error: 'User ID is required!'});
@@ -154,17 +250,19 @@ app.get('/api/get-profile-pic', authMiddleware, async (req, resp) => {
         const files = await glob(filePathPattern);
 
         if (files.length === 0) {
+            logger.warn("Profile picture not found!");
             return resp.status(404).json({success: false, error: 'Profile picture not found'});
         }
 
         resp.sendFile(files[0]);
     } catch (err) {
         console.error('Error finding profile picture:', err);
+        logger.error(err);
         return resp.status(500).json({success: false, error: 'Internal Server Error'});
     }
 });
 
-app.post('/api/new-event', authMiddleware, async (req, resp) => {
+app.post('/api/new-event', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const {name, date} = req.body;
 
@@ -172,16 +270,33 @@ app.post('/api/new-event', authMiddleware, async (req, resp) => {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('events');
 
+        if (name.length === 0 || date.length === 0) {
+            return resp.status(400).json({success: false, error: "Event name or date cannot be empty!"});
+        }
+
+        const eventExists = await collection.findOne({userId: userId, name: name, date: date});
+
+        if (eventExists) {
+            return resp.status(409).json({
+                success: false,
+                error: `There is already an event with the name ${name} for this date!`
+            });
+        }
+
         const event = {userId: userId, name: name, date: date};
         await collection.insertOne(event);
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/get-events', authMiddleware, async (req, resp) => {
+app.post('/api/get-events', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const date = req.body.date;
 
@@ -189,16 +304,24 @@ app.post('/api/get-events', authMiddleware, async (req, resp) => {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('events');
 
+        if (date.length === 0) {
+            return resp.status(400).json({success: false, error: "You cannot request events for an undefined date!"});
+        }
+
         const events = await collection.find({userId: userId, date: date}).toArray();
 
         resp.status(200).json({success: true, events: events});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/delete-event', authMiddleware, async (req, resp) => {
+app.post('/api/delete-event', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const {name, date} = req.body;
 
@@ -206,26 +329,67 @@ app.post('/api/delete-event', authMiddleware, async (req, resp) => {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('events');
 
+        if (name.length === 0 || date.length === 0) {
+            return resp.status(400).json({success: false, error: "Event name or date cannot be empty!"})
+        }
+
+        const eventExists = await collection.findOne({userId: userId, name: name, date: date});
+
+        if (!eventExists) {
+            return resp.status(404).json({success: false, error: "The event you are trying to delete was not found!"});
+        }
+
         await collection.deleteOne({userId: userId, name: name, date: date});
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.get('/api/get-assignments', authMiddleware, async (req, resp) => {
+app.get('/api/get-assignments', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
 
     try {
         const db = getDatabase('scholarthynk');
-        const collection = db.collection('assignments');
+        if (!db) {
+            console.error("Database connection failed!");
+            logger.error("Get Assignment: Database connection failed!");
+            return resp.status(500).json({
+                success: false,
+                error: "There was an error connecting to the database. Please contact the developer immediately!"
+            });
+        }
 
-        const assignments = await collection.find({userId: userId}, {projection: {userId: 0, _id: 0}}).toArray();
+        const collection = db.collection('assignments');
+        if (!collection) {
+            console.error("Collection 'assignments' not found!");
+            logger.error("Get Assignment: Collection 'assignments' not found!");
+            return resp.status(500).json({
+                success: false,
+                error: "There was a database error. Please contact the developer immediately!"
+            });
+        }
+
+        const assignmentsCursor = await collection.find({userId: userId}, {projection: {userId: 0, _id: 0}});
+        if (!assignmentsCursor || typeof assignmentsCursor.toArray !== 'function') {
+            console.error("Invalid cursor returned from MongoDB!");
+            logger.error("Get Assignment: Invalid cursor returned from MongoDB!");
+            return resp.status(500).json({
+                success: false,
+                error: "There was a database error. Please contact the developer immediately!"
+            });
+        }
+
+        const assignments = await assignmentsCursor.toArray();
 
         const currentDate = new Date();
 
-        assignments.forEach(async assignment => {
+        for (const assignment of assignments) {
             if (assignment.expire != null) {
                 const targetTimestamp = assignment.expire;
 
@@ -238,22 +402,26 @@ app.get('/api/get-assignments', authMiddleware, async (req, resp) => {
                     await collection.deleteOne({userId: userId, title: assignment.title});
                 }
             }
-        });
+        }
 
         resp.status(200).json({success: true, assignments: assignments});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/add-assignment', authMiddleware, async (req, resp) => {
+app.post('/api/add-assignment', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const {title, dueDate, subject, priority, description} = req.body;
 
     if (!title || !dueDate || !subject || !priority) return resp.status(400).json({
         success: false,
-        error: 'Missing required fields!'
+        error: 'Fill out all required fields (title, due date, subject, priority)!'
     });
 
     try {
@@ -261,7 +429,10 @@ app.post('/api/add-assignment', authMiddleware, async (req, resp) => {
         const collection = db.collection('assignments');
 
         const assignmentExists = await collection.findOne({userId: userId, title: title});
-        if (assignmentExists) return resp.status(409).json({success: false, error: 'Assignment already exists!'});
+        if (assignmentExists) return resp.status(409).json({
+            success: false,
+            error: `There already is an assignment with the name ${title}!`
+        });
 
         const assignment = {
             userId: userId,
@@ -276,11 +447,15 @@ app.post('/api/add-assignment', authMiddleware, async (req, resp) => {
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/update-assignment', authMiddleware, async (req, resp) => {
+app.post('/api/update-assignment', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const assignment = req.body.assignment;
 
@@ -298,15 +473,28 @@ app.post('/api/update-assignment', authMiddleware, async (req, resp) => {
             expire: assignment.status === "done" ? new Date().setDate(currentDate.getDate() + 10) : null
         }
 
+        const assignmentExists = await collection.findOne({userId: userId, title: assignment.title});
+
+        if (!assignmentExists) {
+            return resp.status(404).json({
+                success: false,
+                error: "The assigment you are trying to update was not found!"
+            });
+        }
+
         await collection.updateOne({userId: userId, title: assignment.title}, {$set: updatedAssignment});
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 })
 
-app.post('/api/delete-assignment', authMiddleware, async (req, resp) => {
+app.post('/api/delete-assignment', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const assignment = req.body.assignment;
 
@@ -314,15 +502,28 @@ app.post('/api/delete-assignment', authMiddleware, async (req, resp) => {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('assignments');
 
+        const assignmentExists = await collection.findOne({userId: userId, title: assignment.title});
+
+        if (!assignmentExists) {
+            return resp.status(404).json({
+                success: false,
+                error: "The assigment you are trying to delete was not found!"
+            });
+        }
+
         await collection.deleteOne({userId: userId, title: assignment.title});
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
+app.post('/api/get-fv-items', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const folder = req.body.folder;
     const path = req.body.path;
@@ -387,7 +588,6 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
             }
         });
 
-        // Format the lastEdited field for folders and files
         folders.forEach(folder => {
             const date = folder.lastEdited;
             const day = String(date.getDate()).padStart(2, '0');
@@ -407,11 +607,15 @@ app.post('/api/get-fv-items', authMiddleware, async (req, resp) => {
         resp.status(200).json({success: true, folders: folders, files: files});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/create-folder', authMiddleware, async (req, resp) => {
+app.post('/api/create-folder', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const parentPath = req.body.folder;
     const folderName = req.body.name;
@@ -467,7 +671,6 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
 
         await collection.insertOne(newFolder);
 
-        // Update children array of parentFolder if parentFolder is not on root level
         if (parentFolder !== null) {
             await collection.updateOne(
                 {userId: userId, _id: newFolder.parentFolder},
@@ -478,11 +681,15 @@ app.post('/api/create-folder', authMiddleware, async (req, resp) => {
         return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        return resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        return resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
+app.post('/api/rename-fv-item', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const itemName = req.body.oldName;
     const newName = req.body.newName;
@@ -518,7 +725,6 @@ app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
 
         const parentFolderId = folderIds.length > 0 ? folderIds[folderIds.length - 1] : null;
 
-        // Find the item (either note or folder)
         const item = await collection.findOne({
             userId: userId,
             name: itemName,
@@ -526,10 +732,12 @@ app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
         });
 
         if (!item) {
-            return resp.status(404).json({success: false, error: "Item not found!"});
+            return resp.status(404).json({
+                success: false,
+                error: `The item with the name '${itemName} was nat found'!`
+            });
         }
 
-        // Check if another item with the new name already exists in the same folder
         const existingItem = await collection.findOne({
             userId: userId,
             name: newName,
@@ -543,7 +751,6 @@ app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
             });
         }
 
-        // Rename the item
         await collection.updateOne(
             {_id: item._id},
             {$set: {name: newName}}
@@ -552,11 +759,15 @@ app.post('/api/rename-fv-item', authMiddleware, async (req, resp) => {
         return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
+app.post('/api/delete-fv-items', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const path = req.body.path;
     const itemName = req.body.folder;
@@ -572,7 +783,6 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
         let folderIds = [];
         let currentFolder = null;
 
-        // Traverse path to get the parent folder
         for (let i = 1; i < path.length; i++) {
             const parentId = i === 1 ? null : folderIds[i - 2];
 
@@ -584,13 +794,12 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
             });
 
             if (!currentFolder) {
-                return resp.status(404).json({success: false, error: `Item "${path[i]}" not found in path!`});
+                return resp.status(404).json({success: false, error: `The item "${path[i]}" was not found!`});
             }
 
             folderIds.push(currentFolder._id);
         }
 
-        // Check if the target item exists (can be folder or note)
         const targetItem = await collection.findOne({
             userId: userId,
             name: itemName,
@@ -598,14 +807,12 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
         });
 
         if (!targetItem) {
-            return resp.status(404).json({success: false, error: "Target item not found!"});
+            return resp.status(404).json({success: false, error: "The item you want to delete was not found!"});
         }
 
-        // If it's a note, delete it directly
         if (targetItem.type === "note") {
             await collection.deleteOne({userId: userId, _id: targetItem._id});
 
-            // Remove note from parent's children list
             if (targetItem.parentFolder) {
                 await collection.updateOne(
                     {userId: userId, _id: targetItem.parentFolder},
@@ -616,7 +823,11 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
             return resp.status(200).json({success: true});
         }
 
-        // If it's a folder, perform recursive deletion
+        /**
+         * Recursively deletes a folder and all its children.
+         * @param {string} folderId The id of the folder to delete.
+         * @returns {Promise<void>}
+         */
         async function deleteFolderRecursive(folderId) {
             const folder = await collection.findOne({userId: userId, _id: folderId});
             if (!folder) return;
@@ -648,11 +859,15 @@ app.post('/api/delete-fv-items', authMiddleware, async (req, resp) => {
         resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/get-note', authMiddleware, async (req, resp) => {
+app.post('/api/get-note', authMiddleware, loggingMiddleware, async (req, resp) => {
     const noteTitle = req.body.title;
     const parentPath = req.body.path;
     const userId = req.user;
@@ -688,17 +903,21 @@ app.post('/api/get-note', authMiddleware, async (req, resp) => {
         }
 
         if (!note) {
-            return resp.status(404).json({success: false, error: 'Note not found!'});
+            return resp.status(404).json({success: false, error: 'Your note was not found!'});
         }
 
         return resp.status(200).json({success: true, note: note});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/new-note', authMiddleware, async (req, resp) => {
+app.post('/api/new-note', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
     const parentPath = req.body.path;
 
@@ -734,7 +953,6 @@ app.post('/api/new-note', authMiddleware, async (req, resp) => {
 
         await collection.insertOne(newNote);
 
-        // Update children array of parentFolder if parentFolder is not on root level
         if (parentFolder !== null) {
             await collection.updateOne(
                 {userId: userId, _id: newNote.parentFolder},
@@ -745,11 +963,15 @@ app.post('/api/new-note', authMiddleware, async (req, resp) => {
         return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
-app.post('/api/update-note', authMiddleware, async (req, resp) => {
+app.post('/api/update-note', authMiddleware, loggingMiddleware, async (req, resp) => {
     const noteTitle = req.body.title;
     const oldNoteTitle = req.body.oldTitle;
     const noteContent = req.body.content;
@@ -759,6 +981,10 @@ app.post('/api/update-note', authMiddleware, async (req, resp) => {
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('notes');
+
+        if (noteTitle === "root") {
+            resp.status(400).json({success: false, error: "You cannot name the note 'root'!"});
+        }
 
         let folderIds = [];
 
@@ -798,14 +1024,30 @@ app.post('/api/update-note', authMiddleware, async (req, resp) => {
         return resp.status(200).json({success: true});
     } catch (error) {
         console.error(error);
-        resp.status(500).json({success: false, error: error.message});
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
     }
 });
 
+/**
+ * Generates an authorization token for the given user ID.
+ * The token is signed with the `secretKey` and expires in 7 days.
+ * @param {string} userId - The user ID to generate the token for.
+ * @returns {string} The generated authorization token.
+ */
 function generateAuthToken(userId) {
     return jwt.sign({userId}, secretKey, {expiresIn: '7d'});
 }
 
+/**
+ * Verifies a given authorization token and returns the payload if valid.
+ * If the token is invalid, it returns null.
+ * @param {string} token - The authorization token to verify.
+ * @returns {Object|null} The payload of the token if it is valid, null otherwise.
+ */
 function verifyAuthToken(token) {
     try {
         return jwt.verify(token, secretKey);
@@ -814,6 +1056,10 @@ function verifyAuthToken(token) {
     }
 }
 
+/**
+ * Generates a unique user ID.
+ * @returns {string} A unique user ID.
+ */
 function generateUserId() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
@@ -821,4 +1067,5 @@ function generateUserId() {
 // Start server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    logger.info(`Server running on port ${port}`);
 });
