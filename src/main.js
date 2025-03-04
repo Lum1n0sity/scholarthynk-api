@@ -900,15 +900,29 @@ app.post('/api/delete-fv-items', authMiddleware, loggingMiddleware, async (req, 
 
 app.post('/api/notes/getNotePath', authMiddleware, loggingMiddleware, async (req, resp) => {
     const userId = req.user;
-    const parent = req.parent;
+    const parent = req.body.parent;
+
+    if (!parent) {
+        return resp.status(400).json({success: false, error: "There was no parent folder of the note provided!"});
+    }
 
     try {
         const db = getDatabase('scholarthynk');
         const collection = db.collection('notes');
 
-        let note = await collection.findOne({userId: userId, parentFolder: parent});
+        const parentFolder = await collection.findOne({userId: userId, _id: parent, type: "folder"});
+        if (!parentFolder) {
+            return resp.status(404).json({success: false, error: "The specified parent folder was not found or you don't have access to it"});
+        }
+
+        const noteId = req.body.noteId;
+        if (!noteId) {
+            return resp.status(400).json({success: false, error: "Note ID is required"});
+        }
+
+        let note = await collection.findOne({userId: userId, _id: noteId, parentFolder: parent});
         if (!note) {
-            return resp.status(404).json({success: false, error: "The note you are trying to open was not found!"});
+            return resp.status(404).json({success: false, error: "The note you are trying to open was not found"});
         }
 
         let path = [note.name];
