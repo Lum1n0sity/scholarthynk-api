@@ -113,7 +113,6 @@ app.post('/api/signup', loggingMiddleware, async (req, resp) => {
         collection.insertOne({userId: userId, name: name, email: email, password: hash, createdAt: new Date()});
         resp.status(200).json({success: true, authToken: authToken});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -155,7 +154,6 @@ app.post('/api/login', loggingMiddleware, async (req, resp) => {
         const token = generateAuthToken(user.userId);
         resp.json({success: true, authToken: token});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -169,22 +167,57 @@ app.get('/api/verify', authMiddleware, loggingMiddleware, async (req, resp) => {
 });
 
 app.post('/api/delete-account', authMiddleware, loggingMiddleware, async (req, resp) => {
+    const db = getDatabase('scholarthynk');
+    const session = db.client.startSession();
+
     try {
-        const db = getDatabase('scholarthynk');
-        const collection = db.collection('users');
+        await session.withTransaction(async () => {
+            let collection = null;
 
-        const user = await collection.findOne({userId: req.user});
-        if (!user) return resp.status(404).json({success: false, error: 'User not found!'});
+            // Delete all assignments of the user
+            collection = db.collection('assignments');
+            await collection.deleteMany({ userId: req.user });
 
-        await collection.deleteOne({userId: req.user});
+            // Delete all events of the user
+            collection = db.collection('events');
+            await collection.deleteMany({ userId: req.user });
+
+            // Delete all notes of the user
+            collection = db.collection('notes');
+            await collection.deleteMany({ userId: req.user });
+
+            // Delete profile picture
+            const filePath = path.join(__dirname, '/uploads/profilePics', `${req.user}.png`);
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (err) {
+                if (err.code !== 'ENOENT') { // Ignore "file not found" errors
+                    throw new Error(`Error deleting profile picture: ${err.message}`);
+                }
+            }
+
+            // Delete user from the users collection
+            collection = db.collection('users');
+            const user = await collection.findOne({ userId: req.user });
+
+            if (!user) throw new Error("User not found!");
+
+            await collection.deleteOne({ userId: req.user });
+
+            // Verify user deletion
+            const userExists = await collection.findOne({ userId: req.user });
+            if (userExists) throw new Error("Unable to delete user!");
+        });
+
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
             error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
         });
+    } finally {
+        session.endSession();
     }
 });
 
@@ -198,7 +231,6 @@ app.get('/api/get-user-data', authMiddleware, loggingMiddleware, async (req, res
 
         resp.status(200).json({success: true, user: user});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -267,7 +299,6 @@ app.get('/api/get-profile-pic', authMiddleware, loggingMiddleware, async (req, r
 
         resp.sendFile(files[0]);
     } catch (err) {
-        console.error('Error finding profile picture:', err);
         logger.error(err);
         return resp.status(500).json({success: false, error: 'Internal Server Error'});
     }
@@ -298,7 +329,6 @@ app.post('/api/new-event', authMiddleware, loggingMiddleware, async (req, resp) 
         await collection.insertOne(event);
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -323,7 +353,6 @@ app.post('/api/get-events', authMiddleware, loggingMiddleware, async (req, resp)
 
         resp.status(200).json({success: true, events: events});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -353,7 +382,6 @@ app.post('/api/delete-event', authMiddleware, loggingMiddleware, async (req, res
         await collection.deleteOne({userId: userId, name: name, date: date});
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -417,7 +445,6 @@ app.get('/api/get-assignments', authMiddleware, loggingMiddleware, async (req, r
 
         resp.status(200).json({success: true, assignments: assignments});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -457,7 +484,6 @@ app.post('/api/add-assignment', authMiddleware, loggingMiddleware, async (req, r
         await collection.insertOne(assignment);
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -496,7 +522,6 @@ app.post('/api/update-assignment', authMiddleware, loggingMiddleware, async (req
         await collection.updateOne({userId: userId, title: assignment.title}, {$set: updatedAssignment});
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -525,7 +550,6 @@ app.post('/api/delete-assignment', authMiddleware, loggingMiddleware, async (req
         await collection.deleteOne({userId: userId, title: assignment.title});
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -617,7 +641,6 @@ app.post('/api/get-fv-items', authMiddleware, loggingMiddleware, async (req, res
 
         resp.status(200).json({success: true, folders: folders, files: files});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -691,7 +714,6 @@ app.post('/api/create-folder', authMiddleware, loggingMiddleware, async (req, re
 
         return resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         return resp.status(500).json({
             success: false,
@@ -769,7 +791,6 @@ app.post('/api/rename-fv-item', authMiddleware, loggingMiddleware, async (req, r
 
         return resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -869,7 +890,6 @@ app.post('/api/delete-fv-items', authMiddleware, loggingMiddleware, async (req, 
         await deleteFolderRecursive(targetItem._id);
         resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -919,7 +939,6 @@ app.post('/api/get-note', authMiddleware, loggingMiddleware, async (req, resp) =
 
         return resp.status(200).json({success: true, note: note});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -973,7 +992,6 @@ app.post('/api/new-note', authMiddleware, loggingMiddleware, async (req, resp) =
 
         return resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
@@ -1034,7 +1052,6 @@ app.post('/api/update-note', authMiddleware, loggingMiddleware, async (req, resp
 
         return resp.status(200).json({success: true});
     } catch (error) {
-        console.error(error);
         logger.error(error);
         resp.status(500).json({
             success: false,
