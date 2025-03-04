@@ -176,15 +176,15 @@ app.post('/api/delete-account', authMiddleware, loggingMiddleware, async (req, r
 
             // Delete all assignments of the user
             collection = db.collection('assignments');
-            await collection.deleteMany({ userId: req.user });
+            await collection.deleteMany({userId: req.user});
 
             // Delete all events of the user
             collection = db.collection('events');
-            await collection.deleteMany({ userId: req.user });
+            await collection.deleteMany({userId: req.user});
 
             // Delete all notes of the user
             collection = db.collection('notes');
-            await collection.deleteMany({ userId: req.user });
+            await collection.deleteMany({userId: req.user});
 
             // Delete profile picture
             const filePath = path.join(__dirname, '/uploads/profilePics', `${req.user}.png`);
@@ -198,14 +198,14 @@ app.post('/api/delete-account', authMiddleware, loggingMiddleware, async (req, r
 
             // Delete user from the users collection
             collection = db.collection('users');
-            const user = await collection.findOne({ userId: req.user });
+            const user = await collection.findOne({userId: req.user});
 
             if (!user) throw new Error("User not found!");
 
-            await collection.deleteOne({ userId: req.user });
+            await collection.deleteOne({userId: req.user});
 
             // Verify user deletion
-            const userExists = await collection.findOne({ userId: req.user });
+            const userExists = await collection.findOne({userId: req.user});
             if (userExists) throw new Error("Unable to delete user!");
         });
 
@@ -894,6 +894,74 @@ app.post('/api/delete-fv-items', authMiddleware, loggingMiddleware, async (req, 
         resp.status(500).json({
             success: false,
             error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
+    }
+});
+
+app.post('/api/notes/getNotePath', authMiddleware, loggingMiddleware, async (req, resp) => {
+    const userId = req.user;
+    const parent = req.body.parent;
+
+    if (!parent) {
+        return resp.status(400).json({success: false, error: "There was no parent folder of the note provided!"});
+    }
+
+    try {
+        const db = getDatabase('scholarthynk');
+        const collection = db.collection('notes');
+
+        const parentFolder = await collection.findOne({userId: userId, _id: parent, type: "folder"});
+        if (!parentFolder) {
+            return resp.status(404).json({success: false, error: "The specified parent folder was not found or you don't have access to it"});
+        }
+
+        const noteId = req.body.noteId;
+        if (!noteId) {
+            return resp.status(400).json({success: false, error: "Note ID is required"});
+        }
+
+        let note = await collection.findOne({userId: userId, _id: noteId, parentFolder: parent});
+        if (!note) {
+            return resp.status(404).json({success: false, error: "The note you are trying to open was not found"});
+        }
+
+        let path = [note.name];
+
+        let currentFolderId = note.parentFolder;
+        while (currentFolderId) {
+            let folder = await collection.findOne({_id: currentFolderId, userId: userId});
+            if (!folder) break;
+            path.unshift(folder.name);
+            currentFolderId = folder.parentFolder;
+        }
+
+        path.unshift("root");
+
+        resp.status(200).json({success: true, path: path});
+    } catch (error) {
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!"
+        });
+    }
+})
+
+app.get('/api/get-notes', authMiddleware, loggingMiddleware, async (req, resp) => {
+    const userId = req.user;
+
+    try {
+        const db = getDatabase('scholarthynk');
+        const collection = db.collection('notes');
+
+        const notes = await collection.find({userId: userId, type: "note"}).toArray();
+
+        resp.status(200).json({success: true, notes: notes});
+    } catch (error) {
+        logger.error(error);
+        resp.status(500).json({
+            success: false,
+            error: "There was an internal server error! Please try again. If this keeps occuring please contact the developer!",
         });
     }
 });
