@@ -7,7 +7,7 @@ const getEvents = async (req, resp) => {
             return resp.status(400).json({error: "You cannot request events for an undefined date!"});
         }
 
-        const events = await Event.find({date: req.date, userId: req.user}).lean();
+        const events = await Event.find({date: req.body.date, userId: req.user}).lean();
 
         resp.status(200).json({events});
     } catch (err) {
