@@ -4,6 +4,9 @@
 /api/user/data
 /api/user/delete
 
+/api/profilePic/upload
+/api/profilePic/get
+
 /api/event/get
 /api/event/new
 /api/event/delete
