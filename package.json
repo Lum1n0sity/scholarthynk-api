@@ -4,7 +4,7 @@
   "description": "The api for the scholarthynk-web-app",
   "main": "main.js",
   "scripts": {
-    "start": "node ./src/main.js"
+    "start": "node ./src/server.js"
   },
   "repository": {
     "type": "git",

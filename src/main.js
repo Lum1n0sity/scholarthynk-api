@@ -1129,16 +1129,6 @@ app.post('/api/update-note', authMiddleware, loggingMiddleware, async (req, resp
 });
 
 /**
- * Generates an authorization token for the given user ID.
- * The token is signed with the `secretKey` and expires in 7 days.
- * @param {string} userId - The user ID to generate the token for.
- * @returns {string} The generated authorization token.
- */
-function generateAuthToken(userId) {
-    return jwt.sign({userId}, secretKey, {expiresIn: '7d'});
-}
-
-/**
  * Verifies a given authorization token and returns the payload if valid.
  * If the token is invalid, it returns null.
  * @param {string} token - The authorization token to verify.
@@ -1146,10 +1136,20 @@ function generateAuthToken(userId) {
  */
 function verifyAuthToken(token) {
     try {
-        return jwt.verify(token, secretKey);
+        return jwt.verify(token, process.env.SECRET_KEY);
     } catch (error) {
         return null;
     }
+}
+
+/**
+ * Generates an authorization token for the given user ID.
+ * The token is signed with the `secretKey` and expires in 7 days.
+ * @param {string} userId - The user ID to generate the token for.
+ * @returns {string} The generated authorization token.
+ */
+function generateAuthToken(userId) {
+    return jwt.sign({userId}, process.env.SECRET_KEY, {expiresIn: '7d'});
 }
 
 /**
