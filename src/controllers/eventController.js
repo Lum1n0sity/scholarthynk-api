@@ -18,15 +18,11 @@ const getEvents = async (req, resp) => {
 
 const newEvent = async (req, resp) => {
     try {
-        if (req.body.name.length === 0 || req.body.date.length === 0) {
-            return resp.status(400).json({error: "Event name or date cannot be empty!"});
-        }
+        if (!req.body.name || !req.body.date || req.body.name.length === 0 || req.body.date.length === 0) return resp.status(400).json({error: "Event name or date cannot be empty!"});
 
         const eventExists = await Event.findOne({name: req.body.name, date: req.body.date, userId: req.user});
 
-        if (eventExists) {
-            return resp.status(409).json({error: `There is already an event with the name ${req.body.name} for this date!`});
-        }
+        if (eventExists) return resp.status(409).json({error: `There is already an event with the name ${req.body.name} for this date!`});
 
         const event = new Event({
             userId: req.user,
