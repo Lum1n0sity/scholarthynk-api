@@ -1,6 +1,19 @@
 const logger = require("../config/logger");
 const Note = require("../models/Note");
 
+/**
+ * Retrieves the full path of a specified note for a given user.
+ * Validates the provided parent folder and note ID, and constructs
+ * the path from the note up to the root folder.
+ *
+ * @param {Object} req - The request object containing user and note information.
+ * @param {string} req.user - The ID of the user requesting the note path.
+ * @param {string} req.body.parent - The ID of the parent folder of the note.
+ * @param {string} req.body.noteId - The ID of the note to retrieve the path for.
+ * @param {Object} resp - The response object used to send the path or error messages.
+ * @returns {Promise<void>}
+ * @throws {Error} If the parent folder or note is not found, or if there is a server error.
+ */
 const getNotePath = async (req, resp) => {
     const userId = req.user;
     const parent = req.body.parent;
@@ -60,6 +73,19 @@ const getNotes = async (req, resp) => {
     }
 };
 
+/**
+ * Retrieves a specific note for the given user based on the provided title and path.
+ * Validates the existence of the parent folders in the path and the note itself.
+ * Returns the note if found, or an error if any part of the path or note is not found.
+ *
+ * @param {Object} req - The request object containing user and note information.
+ * @param {string} req.user - The ID of the user requesting the note.
+ * @param {string} req.body.title - The title of the note to retrieve.
+ * @param {Array<string>} req.body.path - The path of folders leading to the note.
+ * @param {Object} resp - The response object used to send the note or error messages.
+ * @returns {Promise<void>}
+ * @throws {Error} If the parent path or note is not found, or if there is a server error.
+ */
 const getNote = async (req, resp) => {
     const noteTitle = req.body.title;
     const parentPath = req.body.path;
@@ -110,6 +136,19 @@ const getNote = async (req, resp) => {
     }
 };
 
+/**
+ * Creates a new note for the user at the specified parent path.
+ * Validates the existence of the parent folders in the path.
+ * If the note is successfully created, updates the parent folder to include the new note in its children.
+ *
+ * @param {Object} req - The request object containing user and note information.
+ * @param {string} req.user - The ID of the user creating the note.
+ * @param {Array<string>} req.body.path - The path of folders leading to where the note should be created.
+ * @param {Object} resp - The response object used to send success or error messages.
+ * @returns {Promise<void>}
+ * @throws {Error} If the parent path is not provided, any folder in the path is not found,
+ * or if there is a server error.
+ */
 const newNote = async (req, resp) => {
     const userId = req.user;
     const parentPath = req.body.path;
@@ -166,6 +205,22 @@ const newNote = async (req, resp) => {
     }
 };
 
+/**
+ * Updates a note with the provided title, content, and parent path.
+ * Validates the note title and ensures it does not already exist.
+ * Updates the note's content and title in the database.
+ *
+ * @param {Object} req - The request object containing user and note information.
+ * @param {string} req.user - The ID of the user updating the note.
+ * @param {string} req.body.title - The new title of the note to update.
+ * @param {string} req.body.oldTitle - The old title of the note to update.
+ * @param {string} req.body.content - The updated content of the note.
+ * @param {Array<string>} req.body.path - The path of folders leading to the note.
+ * @param {Object} resp - The response object used to send success or error messages.
+ * @returns {Promise<void>}
+ * @throws {Error} If the parent path is not provided, any folder in the path is not found,
+ * or if there is a server error.
+ */
 const updateNote = async (req, resp) => {
     const userId = req.user;
     const noteTitle = req.body.title;

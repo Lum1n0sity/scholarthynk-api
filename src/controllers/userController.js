@@ -11,6 +11,17 @@ const logger = require("../config/logger");
 
 require('dotenv').config();
 
+/**
+ * Returns the user data associated with the user ID provided in the request.
+ * If the user ID does not exist, a 404 Not Found response is returned.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the user ID does not exist or if an internal error occurs.
+ */
 const getUserData = async (req, resp) => {
     try {
         const user = await User.findOne({userId: req.user}, {password: 0, _id: 0, createdAt: 0});
@@ -23,6 +34,20 @@ const getUserData = async (req, resp) => {
     }
 };
 
+/**
+ * Logs a user in and returns a JSON Web Token that can be used to authenticate the user.
+ * The request body must contain the user's email and password.
+ * If the user does not exist, a 404 Not Found response is returned.
+ * If the credentials are invalid, a 401 Unauthorized response is returned.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.body.email - The email of the user.
+ * @param {string} req.body.password - The password of the user.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the user does not exist, if the credentials are invalid, or if an internal error occurs.
+ */
 const loginUser = async (req, resp) => {
     try {
         const user = await User.findOne({email: req.body.email});
@@ -40,6 +65,22 @@ const loginUser = async (req, resp) => {
     }
 };
 
+/**
+ * Signs up a new user.
+ * The request body must contain the user's name, email, and password.
+ * If any of the fields are empty, a 400 Bad Request response is returned.
+ * If the email already exists, a 409 Conflict response is returned.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ * On success, a JSON Web Token is returned in the response body.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.body.name - The name of the user.
+ * @param {string} req.body.email - The email of the user.
+ * @param {string} req.body.password - The password of the user.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If any of the fields are empty, if the email already exists, or if an internal error occurs.
+ */
 const signUpUser = async (req, resp) => {
     try {
         if (req.body.name.length === 0 || req.body.email.length === 0 || req.body.password.length === 0) {
@@ -70,10 +111,32 @@ const signUpUser = async (req, resp) => {
     }
 };
 
+/**
+ * Verifies a given authorization token and returns the user ID if valid.
+ * If the token is invalid, it returns a 401 Unauthorized response.
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user, if the token is valid.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the token is invalid.
+ */
 const verifyAuthToken = (req, resp) => {
     resp.status(200).json({success: true, userId: req.user});
 };
 
+/**
+ * Deletes the user account associated with the given user ID.
+ * The request body must contain the user ID.
+ * If the user ID is invalid, a 400 Bad Request response is returned.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ * On success, a 200 OK response is returned.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user to delete.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the user ID is invalid, or if an internal error occurs.
+ */
 const deleteAccount = async (req, resp) => {
     const session = await mongoose.startSession();
     session.startTransaction();

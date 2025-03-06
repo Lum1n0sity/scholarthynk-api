@@ -1,6 +1,16 @@
 const logger = require("../config/logger");
 const Note = require("../models/Note");
 
+/**
+ * Gets all the folders and notes in the specified folder.
+ * If the folder is root, it will return all the root folders and notes.
+ * If the folder is not root, it will return all the folders and notes in the specified path.
+ * @param {Object} req - The request object.
+ * @param {string} req.body.path - The path of the folder to get the items from.
+ * @param {string} req.body.folder - The name of the folder to get the items from.
+ * @param {Object} resp - The response object.
+ * @return {Promise<void>}
+ */
 const getFVItems = async (req, resp) => {
     const userId = req.user;
     const {path, folder} = req.body;
@@ -65,6 +75,19 @@ const getFVItems = async (req, resp) => {
     }
 };
 
+/**
+ * Creates a new folder in the specified parent path for the user.
+ * Validates the folder name and ensures it does not already exist.
+ * Updates the parent folder to include the new folder in its children.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user creating the folder.
+ * @param {Array<string>} req.body.parentPath - The path of the parent folder where the new folder will be created.
+ * @param {string} req.body.folderName - The name of the new folder to be created.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the folder name is empty, is "root", or if any folder in the path is not found.
+ */
 const newFolder = async (req, resp) => {
     const userId = req.user;
     const parentPath = req.body.parentPath;
@@ -133,6 +156,20 @@ const newFolder = async (req, resp) => {
     }
 };
 
+/**
+ * Renames an item in the specified parent path for the user.
+ * Validates the new name and ensures it does not already exist.
+ * Updates the item's name in the database.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user renaming the item.
+ * @param {string} req.body.oldName - The old name of the item.
+ * @param {string} req.body.newName - The new name of the item.
+ * @param {Array<string>} req.body.path - The path of the parent folder where the item is located.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the new name is empty, is "root", or if any folder in the path is not found.
+ */
 const renameFVItem = async (req, resp) => {
     const userId = req.user;
     const itemName = req.body.oldName;
@@ -185,6 +222,21 @@ const renameFVItem = async (req, resp) => {
     }
 }
 
+/**
+ * Deletes an item from the user's file viewer.
+ * If the item is a note, it is simply removed from the database.
+ * If the item is a folder, it is removed recursively, along with all its children.
+ * If the user is not logged in, or the item does not exist, or the item is the root folder,
+ * the function returns an error.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.user - The ID of the user who is requesting the deletion.
+ * @param {string} req.body.path - The path of the item to delete.
+ * @param {string} req.body.folder - The name of the item to delete.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the user is not logged in, or the item does not exist, or the item is the root folder.
+ */
 const deleteFVItem = async (req, resp) => {
     const userId = req.user;
     const path = req.body.path;

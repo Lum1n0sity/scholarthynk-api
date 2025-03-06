@@ -2,6 +2,14 @@ const path = require("path");
 const {glob} = require('glob');
 const logger = require("../config/logger");
 
+/**
+ * Handles the upload of a profile picture.
+ *
+ * @param {Object} req - The request object containing the file to be uploaded.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>} A promise that resolves with no value.
+ * @throws {Object} If the file is not uploaded successfully.
+ */
 const uploadProfilePicture = async (req, resp) => {
     if (req.file) {
         logger.info({
@@ -18,6 +26,14 @@ const uploadProfilePicture = async (req, resp) => {
     }
 };
 
+/**
+ * Returns the profile picture for the given user.
+ *
+ * @param {Object} req - The request object containing the user.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>} A promise that resolves with no value.
+ * @throws {Object} If the profile picture is not found.
+ */
 const getProfilePicture = async (req, resp) => {
     const userId = req.user;
     if (!userId) {

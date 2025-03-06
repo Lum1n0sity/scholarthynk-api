@@ -3,6 +3,17 @@ const connectDB = require("../config/dbConfig");
 const Event = require("../models/Event");
 const logger = require("../config/logger");
 
+/**
+ * Deletes events from the database that are older than the current month.
+ *
+ * This function connects to the database and retrieves all events.
+ * It iterates through each event, checks if the event date is before
+ * the current month, and deletes those events from the database.
+ *
+ * @returns {Promise<void>}
+ * @throws Will log an error if there is an issue connecting to the
+ * database or deleting events.
+ */
 async function deleteOldEvents() {
     try {
         await connectDB();
@@ -29,7 +40,6 @@ async function deleteOldEvents() {
         }
 
     } catch (err) {
-        console.error("Error deleting old events: ", err);
         logger.error("CronJob error: Error deleting old events: ", err);
     }
 }
@@ -39,4 +49,3 @@ cron.schedule("0 0 1 * *", deleteOldEvents, {
 });
 
 logger.info("Cron job for deleting old events is running...");
-console.log("Cron job for deleting old events is running...");
