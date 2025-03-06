@@ -94,7 +94,7 @@ const deleteAccount = async (req, resp) => {
             }
         }
 
-        const user = User.findOne({userId: req.user}).session(session);
+        const user = await User.findOne({userId: req.user}).session(session);
         if (!user) throw new Error("User not found!");
 
         await user.deleteOne({userId: req.user}).session(session);

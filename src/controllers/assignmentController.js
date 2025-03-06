@@ -5,14 +5,15 @@ const getAssignments = async (req, resp) => {
     try {
         const assignments = await Assignment.find({userId: req.user}).lean();
 
-        for (const assignment of assignments) {
-            if (assignment.expire != null) {
-                const expire = new Date(assignment.expire);
-                const date = new Date();
+        for (let i = 0; i < assignments.length; i++) {
+            const assignment = assignments[i];
 
-                if (expire <= date) {
+            if (assignment.expire !== null) {
+                const expire = new Date(assignment.expire);
+
+                if (expire <= new Date()) {
                     await Assignment.deleteOne({userId: req.user, title: assignment.title});
-                    assignments.splice(assignments.indexOf(assignment), 1);
+                    assignment.splice(i, 1);
                 }
             }
         }
