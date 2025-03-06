@@ -4,7 +4,7 @@
   "description": "The api for the scholarthynk-web-app",
   "main": "main.js",
   "scripts": {
-    "start": "node ./src/main.js"
+    "start": "node ./src/server.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
     "glob": "^11.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.12.0",
