@@ -31,7 +31,7 @@ const getProfilePicture = async (req, resp) => {
 
         if (files.length === 0) {
             logger.warn("Profile picture not found!");
-            resp.status(404).json({error: "Profile picture not found!"});
+            return resp.status(404).json({error: "Profile picture not found!"});
         }
 
         resp.sendFile(files[0]);

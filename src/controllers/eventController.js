@@ -9,7 +9,7 @@ const getEvents = async (req, resp) => {
 
         const events = await Event.find({date: req.body.date, userId: req.user}).lean();
 
-        resp.status(200).json({events});
+        resp.status(200).json({events: events});
     } catch (err) {
         logger.error(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});

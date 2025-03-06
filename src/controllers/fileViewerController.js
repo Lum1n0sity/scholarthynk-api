@@ -71,29 +71,40 @@ const newFolder = async (req, resp) => {
     const folderName = req.body.folderName;
 
     try {
-        if (folderName.length === 0) return resp.status(400).json({
-            success: false,
-            error: "Folder name cannot be empty!"
-        });
+        if (folderName.length === 0) return resp.status(400).json({error: "Folder name cannot be empty!"});
 
-        if (folderName === "root") return resp.status(400).json({
-            success: false,
-            error: "Folder cannot be named 'root'!"
-        });
+        if (folderName === "root") return resp.status(400).json({error: "Folder cannot be named 'root'!"});
 
         let folderIds = [];
 
-        for (const folder of parentPath) {
-            if (folder !== "root") {
-                const id = await Note.findOne({
-                    userId: userId,
-                    type: "folder",
-                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
-                });
-                folderIds.push(id._id);
+        for (const segment of parentPath) {
+            if (segment === "root") {
+                folderIds.push(null);
+                continue;
             }
+
+            const matchedFolder = await Note.findOne({
+                userId: userId,
+                type: "folder",
+                name: segment,
+                parentFolder: folderIds[folderIds.length - 1] ?? null
+            });
+
+            if (!matchedFolder) return resp.status({error: `Folder "${segment}" was not found in path!`});
+
+            folderIds.push(matchedFolder._id);
         }
 
+        // for (const folder of parentPath) {
+        //     if (folder !== "root") {
+        //         const id = await Note.findOne({
+        //             userId: userId,
+        //             type: "folder",
+        //             parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
+        //         });
+        //         folderIds.push(id._id);
+        //     }
+        // }
 
         const parentFolderId = folderIds[folderIds.length - 1];
         const parentFolder = await Note.findOne({userId: userId, _id: parentFolderId});
