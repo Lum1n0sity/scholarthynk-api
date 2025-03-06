@@ -46,6 +46,7 @@ const deleteEvent = async (req, resp) => {
         if (!eventExists) return resp.status(404).json({error: "The event you are trying to delete was not found!"});
 
         await Event.deleteOne({userId: req.user, name: req.body.name, date: req.body.date});
+
         resp.status(200).json({success: true});
     } catch (err) {
         logger.error(err);
