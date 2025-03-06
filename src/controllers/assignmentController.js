@@ -1,6 +1,17 @@
 const logger = require("../config/logger");
 const Assignment = require("../models/Assignment");
 
+/**
+ * This function returns all assignments for a given user.
+ * It also deletes any expired assignments and removes them from the list.
+ *
+ * @function getAssignments
+ * @description Returns all assignments for a given user
+ * @param {Object} req - The Express request object
+ * @param {Object} resp - The Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If there is an internal server error
+ */
 const getAssignments = async (req, resp) => {
     try {
         const assignments = await Assignment.find({userId: req.user}).lean();
@@ -25,6 +36,16 @@ const getAssignments = async (req, resp) => {
     }
 };
 
+/**
+ * This function creates a new assignment.
+ *
+ * @function newAssignment
+ * @description Creates a new assignment
+ * @param {Object} req - The Express request object
+ * @param {Object} resp - The Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If there is an internal server error
+ */
 const newAssignment = async (req, resp) => {
     const {title, dueDate, subject, priority, description} = req.body;
 
@@ -53,6 +74,16 @@ const newAssignment = async (req, resp) => {
     }
 };
 
+/**
+ * This function updates an existing assignment.
+ *
+ * @function updateAssignment
+ * @description Updates an existing assignment
+ * @param {Object} req - The Express request object
+ * @param {Object} resp - The Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If there is an internal server error
+ */
 const updateAssignment = async (req, resp) => {
     const assignment = req.body.assignment;
 
@@ -85,6 +116,16 @@ const updateAssignment = async (req, resp) => {
     }
 };
 
+/**
+ * This function deletes an existing assignment.
+ *
+ * @function deleteAssignment
+ * @description Deletes an existing assignment
+ * @param {Object} req - The Express request object
+ * @param {Object} resp - The Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If there is an internal server error
+ */
 const deleteAssignment = async (req, resp) => {
     try {
         if (!req.body.assignment) return resp.status(400).json({error: "The assignment you are trying to delete cannot be empty!"});

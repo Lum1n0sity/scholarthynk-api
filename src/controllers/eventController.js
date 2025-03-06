@@ -1,6 +1,15 @@
 const logger = require("../config/logger");
 const Event = require("../models/Event");
 
+/**
+ * This function gets all events for a given user for a given date
+ * @function getEvents
+ * @description Returns all events for a given user for a given date
+ * @param {Object} req - The Express request object
+ * @param {Object} resp - The Express response object
+ * @returns {Promise<void>}
+ * @throws {Error} If the date is undefined or there is an internal server error
+ */
 const getEvents = async (req, resp) => {
     try {
         if (!req.body.date || req.body.date.length === 0) return resp.status(400).json({error: "You cannot request events for an undefined date!"});
@@ -14,6 +23,16 @@ const getEvents = async (req, resp) => {
     }
 };
 
+/**
+ * This function creates a new event for a given user.
+ *
+ * @function newEvent
+ * @description Creates a new event entry for a specified user and date.
+ * @param {Object} req - The Express request object, containing event details in the body.
+ * @param {Object} resp - The Express response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the event name or date is missing, if the event already exists, or if there is an internal server error.
+ */
 const newEvent = async (req, resp) => {
     try {
         if (!req.body.name || !req.body.date || req.body.name.length === 0 || req.body.date.length === 0) return resp.status(400).json({error: "Event name or date cannot be empty!"});
@@ -37,6 +56,16 @@ const newEvent = async (req, resp) => {
     }
 };
 
+/**
+ * This function deletes an event for a given user.
+ *
+ * @function deleteEvent
+ * @description Deletes an event entry for a specified user, name, and date.
+ * @param {Object} req - The Express request object, containing event details in the body.
+ * @param {Object} resp - The Express response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the event name or date is missing, if the event does not exist, or if there is an internal server error.
+ */
 const deleteEvent = async (req, resp) => {
     try {
         if (!req.body.name || !req.body.date || req.body.name.length === 0 || req.body.date.length === 0) return resp.status(400).json({error: "Event name or date cannot be empty!"});
