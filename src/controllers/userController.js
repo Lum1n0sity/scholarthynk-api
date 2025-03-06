@@ -3,10 +3,10 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const path = require("path");
 const fs = require("fs");
-const {User} = require("../models/User");
-const {Event} = require("../models/Event");
-const {Assignment} = require("../models/Assignment");
-const {Note} = require("../models/Note");
+const User = require("../models/User");
+const Event = require("../models/Event");
+const Assignment = require("../models/Assignment");
+const Note = require("../models/Note");
 const logger = require("../config/logger");
 
 require('dotenv').config();

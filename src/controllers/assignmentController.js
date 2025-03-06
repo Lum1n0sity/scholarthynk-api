@@ -1,5 +1,5 @@
 const logger = require("../config/logger");
-const {Assignment} = require("../models/Assignment");
+const Assignment = require("../models/Assignment");
 
 const getAssignments = async (req, resp) => {
     try {

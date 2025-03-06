@@ -1,5 +1,5 @@
 const logger = require("../config/logger");
-const {Note} = require("../models/Note");
+const Note = require("../models/Note");
 
 const getNotePath = async (req, resp) => {
     const userId = req.user;
@@ -83,11 +83,6 @@ const getNote = async (req, resp) => {
 
         let note = null;
 
-        /**
-         * Original condition was: parentPath.length !== 1 && parentPath[0] !== "root"
-         * The problem with this condition is that it will never be true since parentPath[0] should always be "root"
-         * If the user then opens a note in a folder, it will never find this note in the database
-         */
         if (parentPath.length !== 1) {
             note = await Note.findOne({
                 userId: userId,
@@ -132,8 +127,8 @@ const newNote = async (req, resp) => {
         const parentFolder = await Note.findOne({userId: userId, _id: parentFolderId});
 
         const newNote = new Note({
-            name: "Untitled",
             userId: userId,
+            name: "Untitled",
             parentFolder: parentFolder ? parentFolderId : null,
             type: "note",
             lastEdited: new Date(),
@@ -142,6 +137,13 @@ const newNote = async (req, resp) => {
         });
 
         await newNote.save();
+
+        if (parentFolder !== null) {
+            await Note.updateOne(
+                {userId: userId, _id: newNote.parentFolder},
+                {$push: {children: newNote._id}}
+            );
+        }
 
         resp.status(200).json({success: true});
     } catch (err) {
@@ -179,11 +181,6 @@ const updateNote = async (req, resp) => {
 
         let note = null;
 
-        /**
-         * Original condition was: parentPath.length !== 1 && parentPath[0] !== "root"
-         * The problem with this condition is that it will never be true since parentPath[0] should always be "root"
-         * If the user then opens a note in a folder, it will never find this note in the database
-         */
         if (parentPath.length !== 1) {
             note = await Note.findOne({
                 userId: userId,

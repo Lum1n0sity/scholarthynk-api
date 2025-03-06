@@ -1,5 +1,5 @@
 const logger = require("../config/logger");
-const {Note} = require("../models/Note");
+const Note = require("../models/Note");
 
 const getFVItems = async (req, resp) => {
     const userId = req.user;
@@ -43,6 +43,7 @@ const getFVItems = async (req, resp) => {
                 }
             }
 
+
             for (const child of currentFolder.children) {
                 const item = await Note.findOne({userId: userId, _id: child});
                 children.push(item);
@@ -55,22 +56,6 @@ const getFVItems = async (req, resp) => {
             } else {
                 files.push(item);
             }
-        });
-
-        folders.forEach(folder => {
-            const date = folder.lastEdited;
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            folder.lastEdited = `${day}.${month}.${year}`;
-        });
-
-        files.forEach(file => {
-            const date = file.lastEdited;
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            file.lastEdited = `${day}.${month}.${year}`;
         });
 
         resp.status(200).json({success: true, folders: folders, files: files});
@@ -126,7 +111,10 @@ const newFolder = async (req, resp) => {
             userId: userId,
             name: folderName,
             parentFolder: parentFolder,
-            type: "folder"
+            type: "folder",
+            lastEdited: new Date(),
+            children: [],
+            fileContent: ""
         });
 
         await newFolder.save();

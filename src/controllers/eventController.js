@@ -1,9 +1,9 @@
 const logger = require("../config/logger");
-const {Event} = require("../models/Event");
+const Event = require("../models/Event");
 
 const getEvents = async (req, resp) => {
     try {
-        if (req.date.length === 0) {
+        if (req.body.date.length === 0) {
             return resp.status(400).json({error: "You cannot request events for an undefined date!"});
         }
 

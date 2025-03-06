@@ -16,7 +16,7 @@ const fileViewerRoutes = require("./routes/fileViewerRoutes");
 
 app.use(cors());
 app.use(express.json());
-app.use(authMiddleware);
+
 app.use(loggingMiddleware);
 
 // DB connection
@@ -24,6 +24,8 @@ connectDB();
 
 // Routes
 app.use('/api/user', userRoutes);
+
+app.use(authMiddleware);
 app.use('/api/profilePic', profilePictureRoutes);
 app.use('/api/event', eventRoutes);
 app.use('/api/assignment', assignmentRoutes);
