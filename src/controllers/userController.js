@@ -13,7 +13,7 @@ require('dotenv').config();
 
 const getUserData = async (req, resp) => {
     try {
-        const user = await User.findOne({userId: req.user}, {projection: {password: 0, _id: 0, createdAt: 0}});
+        const user = await User.findOne({userId: req.user}, {password: 0, _id: 0, createdAt: 0});
         if (!user) return resp.status(404).json({error: "Your account was not found!"});
 
         resp.status(200).json({user: user});
@@ -46,7 +46,7 @@ const signUpUser = async (req, resp) => {
             return resp.status(400).json({error: "All fields are required!"});
         }
 
-        const userExists = User.findOne({email: req.body.email});
+        const userExists = await User.findOne({email: req.body.email});
         if (userExists) return resp.status(409).json({error: "User already exists!"});
 
         const userId = generateUserId();
