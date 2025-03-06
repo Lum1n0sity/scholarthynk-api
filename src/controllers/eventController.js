@@ -3,9 +3,7 @@ const Event = require("../models/Event");
 
 const getEvents = async (req, resp) => {
     try {
-        if (req.body.date.length === 0) {
-            return resp.status(400).json({error: "You cannot request events for an undefined date!"});
-        }
+        if (!req.body.date || req.body.date.length === 0) return resp.status(400).json({error: "You cannot request events for an undefined date!"});
 
         const events = await Event.find({date: req.body.date, userId: req.user}).lean();
 
@@ -41,7 +39,7 @@ const newEvent = async (req, resp) => {
 
 const deleteEvent = async (req, resp) => {
     try {
-        if (req.body.name.length === 0 || req.body.date.length === 0) return resp.status(400).json({error: "Event name or date cannot be empty!"});
+        if (!req.body.name || !req.body.date || req.body.name.length === 0 || req.body.date.length === 0) return resp.status(400).json({error: "Event name or date cannot be empty!"});
 
         const eventExists = await Event.findOne({userId: req.user, name: req.body.name, date: req.body.date});
 
