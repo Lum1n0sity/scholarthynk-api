@@ -7,7 +7,7 @@ async function deleteOldEvents() {
     try {
         await connectDB();
 
-        const events = await Event.find({date: req.body.date}).lean();
+        const events = await Event.find({}).lean();
 
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
