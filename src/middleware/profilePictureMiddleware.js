@@ -11,10 +11,11 @@ const storageProfilePics = multer.diskStorage({
         cb(null, 'uploads/profilePics');
     },
     filename: (req, file, cb) => {
-        const userId = req.user;
-        if (!userId) {
+        if (!req.user) {
             return cb(new Error('User ID is required'), null);
         }
+
+        const userId = req.user;
         cb(null, userId + '.png');
     },
 });
