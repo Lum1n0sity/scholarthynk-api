@@ -10,8 +10,9 @@ const getAssignments = async (req, resp) => {
                 const expire = new Date(assignment.expire);
                 const date = new Date();
 
-                if (expire >= date) {
+                if (expire <= date) {
                     await Assignment.deleteOne({userId: req.user, title: assignment.title});
+                    assignments.splice(assignments.indexOf(assignment), 1);
                 }
             }
         }
