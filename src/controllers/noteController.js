@@ -83,7 +83,7 @@ const getNote = async (req, resp) => {
                 parentFolder: folderIds[folderIds.length - 1] ?? null
             });
 
-            if (!matchedFolder) return resp.status({error: `Folder "${segment}" was not found in path!`});
+            if (!matchedFolder) return resp.status(404).json({error: `Folder "${segment}" was not found in path!`});
 
             folderIds.push(matchedFolder._id);
         }
@@ -132,7 +132,7 @@ const newNote = async (req, resp) => {
                 parentFolder: folderIds[folderIds.length - 1] ?? null
             });
 
-            if (!matchedFolder) return resp.status({error: `Folder "${segment}" was not found in path!`});
+            if (!matchedFolder) return resp.status(404).json({error: `Folder "${segment}" was not found in path!`});
 
             folderIds.push(matchedFolder._id);
         }
@@ -195,7 +195,7 @@ const updateNote = async (req, resp) => {
                 parentFolder: folderIds[folderIds.length - 1] ?? null
             });
 
-            if (!matchedFolder) return resp.status({error: `Folder "${segment}" was not found in path!`});
+            if (!matchedFolder) return resp.status(404).json({error: `Folder "${segment}" was not found in path!`});
 
             folderIds.push(matchedFolder._id);
         }
