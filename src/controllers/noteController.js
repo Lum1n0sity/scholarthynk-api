@@ -112,15 +112,22 @@ const newNote = async (req, resp) => {
     try {
         let folderIds = [];
 
-        for (const folder of parentPath) {
-            if (folder !== "root") {
-                const id = await Note.findOne({
-                    userId: userId,
-                    type: "folder",
-                    parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
-                });
-                folderIds.push(id._id);
+        for (const segment of parentPath) {
+            if (segment === "root") {
+                folderIds.push(null);
+                continue;
             }
+
+            const matchedFolder = await Note.findOne({
+                userId: userId,
+                type: "folder",
+                name: segment,
+                parentFolder: folderIds[folderIds.length - 1] ?? null
+            });
+
+            if (!matchedFolder) return resp.status({error: `Folder "${segment}" was not found in path!`});
+
+            folderIds.push(matchedFolder._id);
         }
 
         const parentFolderId = folderIds[folderIds.length - 1];
