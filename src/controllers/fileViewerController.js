@@ -95,17 +95,6 @@ const newFolder = async (req, resp) => {
             folderIds.push(matchedFolder._id);
         }
 
-        // for (const folder of parentPath) {
-        //     if (folder !== "root") {
-        //         const id = await Note.findOne({
-        //             userId: userId,
-        //             type: "folder",
-        //             parentFolder: folder === "root" ? null : folderIds[folderIds.length - 1]
-        //         });
-        //         folderIds.push(id._id);
-        //     }
-        // }
-
         const parentFolderId = folderIds[folderIds.length - 1];
         const parentFolder = await Note.findOne({userId: userId, _id: parentFolderId});
 
@@ -189,7 +178,7 @@ const renameFVItem = async (req, resp) => {
             {$set: {name: newName}}
         );
 
-        return resp.status(200).json({success: true});
+        resp.status(200).json({success: true});
     } catch (err) {
         logger.error(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
