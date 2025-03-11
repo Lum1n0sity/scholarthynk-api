@@ -16,19 +16,6 @@ const getAssignments = async (req, resp) => {
     try {
         const assignments = await Assignment.find({userId: req.user}).lean();
 
-        for (let i = 0; i < assignments.length; i++) {
-            const assignment = assignments[i];
-
-            if (assignment.expire !== null) {
-                const expire = new Date(assignment.expire);
-
-                if (expire <= new Date()) {
-                    await Assignment.deleteOne({userId: req.user, title: assignment.title});
-                    assignments.splice(i, 1);
-                }
-            }
-        }
-
         resp.status(200).json({assignments: assignments});
     } catch (err) {
         logger.error(err);
