@@ -11,3 +11,4 @@ app.listen(port, () => {
 });
 
 require('./cronjobs/cleanupEvents');
+require('./cronjobs/cleanupAssignments');
