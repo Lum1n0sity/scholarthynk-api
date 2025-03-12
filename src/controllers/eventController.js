@@ -4,7 +4,7 @@ const Event = require("../models/Event");
 /**
  * This function gets all events for a given user for a given date
  * @function getEvents
- * @description Returns all events for a given user for a given date
+ *
  * @param {Object} req - The Express request object
  * @param {Object} resp - The Express response object
  * @returns {Promise<void>}
