@@ -9,6 +9,6 @@ const transport = pino.transport({
     ]
 });
 
-const logger = pino({level: "info"}, transport);
+const logger = pino({level: "info", timestamp: pino.stdTimeFunctions.isoTime}, transport);
 
 module.exports = logger;
