@@ -1,7 +1,7 @@
 
 # Scholarthynk-API
 
-The ScholarThynk API serves as the backend for the ScholarThynk web application, providing endpoints for managing notes, assignments, events, and study recommendations. Built with JavaScript, this API enables seamless data handling and integration with the ScholarThynk frontend.
+The ScholarThynk API serves as the backend for the ScholarThynk web application, providing endpoints for managing notes, assignments, and events. Built with JavaScript, this API enables seamless data handling and integration with the ScholarThynk frontend.
 
 ## Features
 - RESTful API for managing user data and study-related content
