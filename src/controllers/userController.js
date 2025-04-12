@@ -161,15 +161,16 @@ const logoutUser = async (req, resp) => {
 const updateRole = async (req, resp) => {
     try {
         const action = req.body.action;
+        const userEmail = req.body.email;
 
-        const userExists = await User.findOne({userId: req.user});
+        const userExists = await User.findOne({email: userEmail});
         if (!userExists) return resp.status(200).json({error: "User doesn't exists!"});
 
         if (action === "promote") {
-            await User.updateOne({userId: req.user}, {$set: {role: "admin"}});
+            await User.updateOne({email: userEmail}, {$set: {role: "admin"}});
             return resp.status(200).json({success: true});
         } else if (action === "demote") {
-            await User.updateOne({userId: req.user}, {$set: {role: "user"}});
+            await User.updateOne({email: userEmail}, {$set: {role: "user"}});
             return resp.status(200).json({success: true});
         } else {
             return resp.status(400).json({error: "Invalid action!"});
