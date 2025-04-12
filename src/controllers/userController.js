@@ -132,16 +132,49 @@ const signUpUser = async (req, resp) => {
  */
 const logoutUser = async (req, resp) => {
     try {
-        if (req.body.email.length === 0) {
-            return resp.status(400).json({error: "Unable to logout! Email was not provided!"});
-        }
-
-        const userExists = await User.findOne({email: req.body.email});
+        const userExists = await User.findOne({userId: req.user});
         if (!userExists) return resp.status(200).json({error: "User doesn't exists!"});
 
-        await User.updateOne({email: req.body.email}, {$set: {status:"offline"}});
+        await User.updateOne({userId: req.user}, {$set: {status:"offline"}});
 
         resp.status(200).json({success: true});
+    } catch (err) {
+        logger.error(err);
+        resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
+    }
+}
+
+/**
+ * Updates the role of the user.
+ * The request body must contain the action to take, either "promote" or "demote".
+ * If the action is "promote", the user's role is set to "admin".
+ * If the action is "demote", the user's role is set to "user".
+ * If the action is not one of the above, a 400 Bad Request response is returned.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.body.action - The action to take, either "promote" or "demote".
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the action is invalid, or if an internal error occurs.
+ */
+const updateRole = async (req, resp) => {
+    try {
+        const action = req.body.action;
+        const userEmail = req.body.email;
+
+        const userExists = await User.findOne({email: userEmail});
+        if (!userExists) return resp.status(200).json({error: "User doesn't exists!"});
+
+        if (action === "promote") {
+            await User.updateOne({email: userEmail}, {$set: {role: "admin"}});
+            return resp.status(200).json({success: true});
+        } else if (action === "demote") {
+            await User.updateOne({email: userEmail}, {$set: {role: "user"}});
+            return resp.status(200).json({success: true});
+        } else {
+            return resp.status(400).json({error: "Invalid action!"});
+        }
     } catch (err) {
         logger.error(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
@@ -233,4 +266,4 @@ function generateUserId() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-module.exports = {getUserData, loginUser, signUpUser, logoutUser, verifyAuthToken, deleteAccount};
+module.exports = {getUserData, loginUser, signUpUser, logoutUser, verifyAuthToken, deleteAccount, updateRole};
