@@ -162,6 +162,9 @@ const updateRole = async (req, resp) => {
     try {
         const action = req.body.action;
 
+        const userExists = await User.findOne({userId: req.user});
+        if (!userExists) return resp.status(200).json({error: "User doesn't exists!"});
+
         if (action === "promote") {
             await User.updateOne({userId: req.user}, {$set: {role: "admin"}});
             return resp.status(200).json({success: true});

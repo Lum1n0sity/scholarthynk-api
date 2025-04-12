@@ -12,7 +12,7 @@ const authLimiter = rateLimit({
 
 router.post('/login', authLimiter, loginUser);
 router.post('/signup', authLimiter, signUpUser);
-router.get('/logout', authMiddleware, logoutUser);
+router.post('/logout', authMiddleware, logoutUser);
 router.get('/data', authMiddleware, getUserData);
 router.post('/role', authMiddleware, updateRole);
 router.get('/verify', authMiddleware, verifyAuthToken);
