@@ -13,6 +13,7 @@ const eventRoutes = require("./routes/eventRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
 const noteRoutes = require("./routes/noteRoutes");
 const fileViewerRoutes = require("./routes/fileViewerRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -32,5 +33,6 @@ app.use('/api/event', eventRoutes);
 app.use('/api/assignment', assignmentRoutes);
 app.use('/api/note', noteRoutes);
 app.use('/api/fileViewer', fileViewerRoutes);
+app.use('/api/admin', adminRoutes);
 
 module.exports = app;
