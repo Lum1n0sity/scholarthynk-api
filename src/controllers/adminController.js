@@ -42,3 +42,7 @@ const getLogs = async (req, resp) => {
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 }
+
+module.exports = {
+    getLogs
+};
