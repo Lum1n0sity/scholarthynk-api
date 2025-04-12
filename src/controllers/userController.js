@@ -117,6 +117,19 @@ const signUpUser = async (req, resp) => {
     }
 };
 
+/**
+ * Logs a user out and changes their status to "offline".
+ * The request body must contain the user's email.
+ * If the email is not provided, a 400 Bad Request response is returned.
+ * If the user does not exist, a 200 OK response is returned with an error message.
+ * If an internal error occurs, a 500 Internal Server Error response is returned.
+ *
+ * @param {Object} req - The request object.
+ * @param {string} req.body.email - The email of the user.
+ * @param {Object} resp - The response object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the email is not provided, if the user does not exist, or if an internal error occurs.
+ */
 const logoutUser = async (req, resp) => {
     try {
         if (req.body.email.length === 0) {
