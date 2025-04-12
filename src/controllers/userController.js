@@ -24,7 +24,7 @@ require('dotenv').config();
  */
 const getUserData = async (req, resp) => {
     try {
-        const user = await User.findOne({userId: req.user}, {password: 0, _id: 0, createdAt: 0});
+        const user = await User.findOne({userId: req.user}, {password: 0, _id: 0, createdAt: 0, lastLogin: 0});
         if (!user) return resp.status(404).json({error: "Your account was not found!"});
 
         resp.status(200).json({user: user});
@@ -57,6 +57,8 @@ const loginUser = async (req, resp) => {
         if (!isMatch) return resp.status(401).json({error: "Invalid credentials!"});
 
         const token = generateAuthToken(user.userId);
+
+        await User.updateOne({email: req.body.email}, {$set: {status: "online", lastLogin: new Date()}});
 
         resp.status(200).json({authToken: token});
     } catch (err) {
@@ -99,7 +101,11 @@ const signUpUser = async (req, resp) => {
             name: req.body.name,
             email: req.body.email,
             password: hash,
-            createdAt: new Date()
+            createdAt: new Date(),
+            role: "user",
+            lastLogin: new Date(),
+            status: "online",
+            isDisabled: false
         });
 
         await newUser.save();
@@ -110,6 +116,24 @@ const signUpUser = async (req, resp) => {
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
+
+const logoutUser = async (req, resp) => {
+    try {
+        if (req.body.email.length === 0) {
+            return resp.status(400).json({error: "Unable to logout! Email was not provided!"});
+        }
+
+        const userExists = await User.findOne({email: req.body.email});
+        if (!userExists) return resp.status(200).json({error: "User doesn't exists!"});
+
+        await User.updateOne({email: req.body.email}, {$set: {status:"offline"}});
+
+        resp.status(200).json({success: true});
+    } catch (err) {
+        logger.error(err);
+        resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
+    }
+}
 
 /**
  * Verifies a given authorization token and returns the user ID if valid.
@@ -196,4 +220,4 @@ function generateUserId() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-module.exports = {getUserData, loginUser, signUpUser, verifyAuthToken, deleteAccount};
+module.exports = {getUserData, loginUser, signUpUser, logoutUser, verifyAuthToken, deleteAccount};

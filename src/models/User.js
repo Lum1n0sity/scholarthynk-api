@@ -5,7 +5,11 @@ const userSchema = new mongoose.Schema({
     name: String,
     email: String,
     password: String,
-    createdAt: Date
+    createdAt: Date,
+    role: String,
+    lastLogin: Date,
+    status: String,
+    isDisabled: Boolean
 });
 
 const User = mongoose.model("User", userSchema);
