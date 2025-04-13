@@ -18,7 +18,7 @@ const getEvents = async (req, resp) => {
 
         resp.status(200).json({events: events});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };
@@ -51,7 +51,7 @@ const newEvent = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };
@@ -78,7 +78,7 @@ const deleteEvent = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };

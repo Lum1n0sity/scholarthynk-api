@@ -22,7 +22,7 @@ async function deleteExpiredAssignments() {
 
         logger.info(`CronJob: Deleted ${result.deletedCount} expired assignments`);
     } catch (err) {
-        logger.error("CronJob error: Error deleting expired assignments: ", err);
+        logger.fatal("CronJob error: Error deleting expired assignments: ", err);
     }
 }
 
