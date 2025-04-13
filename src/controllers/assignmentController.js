@@ -18,7 +18,7 @@ const getAssignments = async (req, resp) => {
 
         resp.status(200).json({assignments: assignments});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };
@@ -56,7 +56,7 @@ const newAssignment = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };
@@ -98,7 +98,7 @@ const updateAssignment = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 };
@@ -124,7 +124,7 @@ const deleteAssignment = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again. If this keeps occurring please contact the developer!"});
     }
 }

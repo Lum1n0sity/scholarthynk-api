@@ -44,7 +44,7 @@ const getNotePath = async (req, resp) => {
 
         return resp.status(200).json({path: path});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -68,7 +68,7 @@ const getNotes = async (req, resp) => {
 
         resp.status(200).json({notes: notes});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -131,7 +131,7 @@ const getNote = async (req, resp) => {
 
         return resp.status(200).json({note: note});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -200,7 +200,7 @@ const newNote = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -277,7 +277,7 @@ const updateNote = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };

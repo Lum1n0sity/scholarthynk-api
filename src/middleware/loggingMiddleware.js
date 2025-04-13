@@ -7,7 +7,8 @@ const logger = require('../config/logger');
  * @param {Function} next - The next middleware in the stack.
  */
 const loggingMiddleware = (req, res, next) => {
-    logger.info({method: req.method, url: req.url, user: req.user || "guest"}, "Incoming request");
+    if (req.url )
+    logger.info({method: req.method, url: /^\/[^\/]+$/.test(req.url) ? `/api/user${req.url}` : req.url, user: req.user || "guest"}, "Incoming request");
     next();
 };
 

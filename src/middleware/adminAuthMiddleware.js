@@ -16,7 +16,7 @@ const adminAuthMiddleware = async (req, res, next) => {
 
         next();
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         return res.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };

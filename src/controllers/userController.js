@@ -29,7 +29,7 @@ const getUserData = async (req, resp) => {
 
         resp.status(200).json({user: user});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -62,7 +62,7 @@ const loginUser = async (req, resp) => {
 
         resp.status(200).json({authToken: token});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -112,7 +112,7 @@ const signUpUser = async (req, resp) => {
 
         resp.status(200).json({authToken: authToken});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
@@ -139,7 +139,7 @@ const logoutUser = async (req, resp) => {
 
         resp.status(200).json({success: true});
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 }
@@ -176,7 +176,7 @@ const updateRole = async (req, resp) => {
             return resp.status(400).json({error: "Invalid action!"});
         }
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 }
@@ -241,7 +241,7 @@ const deleteAccount = async (req, resp) => {
     } catch (err) {
         await session.abortTransaction();
 
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     } finally {
         await session.endSession();

@@ -40,7 +40,7 @@ async function deleteOldEvents() {
         }
 
     } catch (err) {
-        logger.error("CronJob error: Error deleting old events: ", err);
+        logger.fatal("CronJob error: Error deleting old events: ", err);
     }
 }
 

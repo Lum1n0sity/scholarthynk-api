@@ -52,7 +52,7 @@ const getProfilePicture = async (req, resp) => {
 
         resp.sendFile(files[0]);
     } catch (err) {
-        logger.error(err);
+        logger.fatal(err);
         resp.status(500).json({error: "There was an internal server error! Please try again! If this error keeps occurring, please contact the developer!"});
     }
 };
